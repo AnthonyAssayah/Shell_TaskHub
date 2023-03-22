@@ -9,6 +9,7 @@
 
 int main() {
 char command[1024];
+char last_command[1024] = ""; 
 char *token;
 int i;
 char *outfile;
@@ -38,6 +39,25 @@ while (1)
     }
     argv1[i] = NULL;
     argc1 = i;
+
+    
+    // Echo command
+    if (strcmp(argv1[0], "echo") == 0)
+    {
+
+        for (int j = 1; j < i; j++)
+        {
+            printf("%s ", argv1[j]);
+            if (strcmp(argv1[j], "$?") == 0)
+            {
+                // strcpy(command, last_command);
+                printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
+            }
+            strcpy(command, last_command);
+        }
+        printf("\n");
+        continue;
+    }
 
     /* Is command empty */
     if (argv1[0] == NULL)
