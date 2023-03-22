@@ -1,18 +1,18 @@
 CC = gcc
 CFLAGS = -Wall -g
 
-all: shell
+all: myshell
 
-shell: shell.o
-	$(CC) $(CFLAGS) -o shell shell.o
+myshell: shell.o
+	$(CC) $(CFLAGS) -o myshell shell.o
 
 shell.o: shell.c
 	$(CC) $(CFLAGS) -c shell.c
 
-.PHONY: clean
+.PHONY: all clean
 
 clean: 
-	rm -f *.o shell
+	rm -f *.o myshell
 
 
 
