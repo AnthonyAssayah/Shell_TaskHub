@@ -8,52 +8,34 @@
 #define MAX_LINE_LEN 1024
 #define WHITESPACE " \t\n\r"
 
-char **parse_outfile_name(char *token, char **outfile, char **argv) {
-    if (strlen(token) != 0) { // check for empty string
-        *outfile = token;
-        return argv;
+
+int parse_command(char **argv, char *command) {
+    /* parse command line */
+    int i = 0;
+    char *token = strtok(command, WHITESPACE);
+    while (token != NULL) {
+        argv[i++] = token;
+        token = strtok(NULL, WHITESPACE);
     }
-    // there was a space after > - next token should be the outfile name
-    if ((token = strtok(NULL, WHITESPACE)) == NULL) { // check for error
-        free(argv);
-        return NULL;
-    }
-    *outfile = token;
-    return argv;
+    argv[i] = NULL;
+    return i;
 }
 
-char **tokenize_command(char *command, char **outfile, int *redirect, int *amper) {
-    char *token = NULL;
-    size_t capacity = 10;
-    char **argv = calloc(capacity, sizeof(char *));
-
-    size_t argv_len = 1; // start from 1 (first arg is the command name)
-    while ((token = strtok(NULL, WHITESPACE)) != NULL) {
-        if (token[0] == '>') {
-            *redirect = 1;
-            return parse_outfile_name(&token[1], outfile, argv);
-        } else if (token[0] == '&') {
-            *amper = 1;
-            return argv;
-        }
-        if ((argv_len + 1) == capacity) { // check if argv array is full
-            capacity *= 2;
-            argv = realloc(argv, capacity * sizeof(char *));
-        }
-        argv[argv_len++] = token; // add token to expanded argv array
+void args_handler(char **argv, int argc, char **outfile, int *redirect, int *amper, char *prompt) {
+    if (!strcmp(argv[argc - 1], "&")) {
+        *amper = 1;
+        argv[argc - 1] = NULL;
     }
-    return argv;
+    else if (argc > 1 && !strcmp(argv[argc - 2], ">")) {
+        *redirect = 1;
+        argv[argc - 2] = NULL;
+        *outfile = argv[argc - 1];
+    }
+    // Change prompt
+    else if (argc == 3 && strcmp(argv[0], "prompt") == 0 && strcmp(argv[1], "=") == 0) {
+        strcpy(prompt, argv[2]);
+    }
 }
-
-//void exec_child(char *command, char **argv, char *outfile) {
-//    int out_fd = -1;
-//    if (outfile != NULL) { // check for redirection
-//        out_fd = open(outfile, O_RDWR | O_CREAT);
-//        if (out_fd < 0) {
-//
-//        }
-//    }
-//}
 
 int main() {
     // init variables for shell
@@ -63,35 +45,37 @@ int main() {
     char *token;
     char *outfile = NULL;
     int i, fd, amper, redirect, retid, status;
-    char **argv;
-    char prompt[MAX_LINE_LEN + 1] = "hello:";
+    char *argv[10];
+    char prompt[MAX_LINE_LEN + 1] = "hello";
 
     memset(command, 0, MAX_LINE_LEN + 1);
 
     while (1) {
 
-        printf("%s ", prompt);
-
         memset(command, 0, MAX_LINE_LEN + 1);
+
+        printf("%s: ", prompt);
+
         if (!fgets(command, MAX_LINE_LEN, stdin)) {
             break;
         }
 
-        token = strtok(command, WHITESPACE); // get first command
-        if (strcmp(token, "quit") == 0) {
-            break;
-        }
+        command[strlen(command) - 1] = '\0'; // replace \n with \0
+        redirect = amper = 0;
 
-        redirect = 0;
-        amper = 0;
         // get command line arguments
-        argv = tokenize_command(command, &outfile, &redirect, &amper);
-        argv[0] = token;
+        int argc = parse_command(argv, command);
 
         /* Is command empty */
         if (argv[0] == NULL) {
             continue;
         }
+
+        if (strcmp(argv[0], "quit") == 0) {
+            break;
+        }
+
+        args_handler(argv, argc, &outfile, &redirect, &amper, prompt);
 
         /* for commands not part of the shell command language */
         if (fork() == 0) {
@@ -109,9 +93,6 @@ int main() {
         if (amper == 0) {
             retid = wait(&status);
         }
-
-
-
     }
 
     return 0;
