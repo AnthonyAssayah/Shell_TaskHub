@@ -12,13 +12,14 @@
 // init global variables for shell
 char command[MAX_LINE_LEN + 1];
 char last_command[MAX_LINE_LEN + 1] = ""; // initialize last_command as empty string
-int last_command_flag = 0;
 char *outfile = NULL, *token;
 int i, fd, amper, redirect, retid, status, piping;
 char *argv1[10], *argv2[10];
 int argc1, redirect_fd, append;
-char prompt[MAX_LINE_LEN + 1] = "hello";
+char prompt[MAX_LINE_LEN + 1] = "hello:";
 sigjmp_buf jmpbuf;
+int fildes[2];
+
 
 void handleOutputRedirect();
 
@@ -63,6 +64,7 @@ void parseCommand() {
 
 int main() {
     memset(command, 0, MAX_LINE_LEN + 1);
+    memset(last_command, 0, MAX_LINE_LEN + 1);
 
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -72,11 +74,19 @@ int main() {
 
     while (1) {
 
-        printf("%s: ", prompt);
+        printf("%s ", prompt);
 
         if (!fgets(command, MAX_LINE_LEN, stdin)) {
             break;
         }
+        command[strlen(command) - 1] = '\0';
+
+        if (strcmp(command, "!!") == 0) {
+            strcpy(command, last_command); // strcpy(src, dest)
+        } else {
+            strcpy(last_command, command); // save command for next iteration
+        }
+
 
         // get command line arguments
         parseCommand();
@@ -113,7 +123,28 @@ int main() {
                 dup(fd);
                 close(fd);
             }
-            execvp(argv1[0], argv1);
+            if (piping) {
+                pipe(fildes);
+                if (fork() == 0) {
+                    /* first component of command line */
+                    close(STDOUT_FILENO);
+                    dup(fildes[1]);
+                    close(fildes[1]);
+                    close(fildes[0]);
+                    /* stdout now goes to pipe */
+                    /* child process does command */
+                    execvp(argv1[0], argv1);
+                }
+                /* 2nd command component of command line */
+                close(STDIN_FILENO);
+                dup(fildes[0]);
+                close(fildes[0]);
+                close(fildes[1]);
+                /* standard input now comes from pipe */
+                execvp(argv2[0], argv2);
+            } else {
+                execvp(argv1[0], argv1);
+            }
         }
         /* parent continues here */
         if (amper == 0) {
@@ -149,6 +180,22 @@ int handleShellCommands() {
             }
         }
         printf("\n");
+        return 1;
+    }
+
+    // 5. Change dir
+    if (strcmp(argv1[0], "cd") == 0) {
+        if (i < 2) {
+            printf("i = %d\n", i);
+            printf("cd: missing operand\n");
+            return 1;
+        } else if (chdir(argv1[1]) < 0) {
+            printf("cd: %s: No such file or directory\n", argv1[1]);
+            return 1;
+        }
+        // print current directory
+        char cwd[1024];
+        printf("%s \n", getcwd(cwd, sizeof(cwd)));
         return 1;
     }
 
