@@ -173,8 +173,15 @@ int handleShellCommands() {
     // 3. Echo command
     if (strcmp(argv1[0], "echo") == 0) {
         for (int j = 1; j < argc1; ++j) {
-            if (strcmp(argv1[j], "$?") == 0) {
-                printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
+            if (argv1[j][0] == '$') { // check if argument is a variable
+                if (strcmp(argv1[j], "$?") == 0) {
+                    printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
+                } else {
+                    char *var_value = getenv(argv1[j] + 1); // get the value of the variable
+                    if (var_value != NULL) {
+                        printf("%s ", var_value); // print the value of the variable
+                    }
+                }
             } else {
                 printf("%s ", argv1[j]);
             }
@@ -196,6 +203,17 @@ int handleShellCommands() {
         // print current directory
         char cwd[1024];
         printf("%s \n", getcwd(cwd, sizeof(cwd)));
+        return 1;
+    }
+
+    // Add new variables
+    if (argv1[0][0] == '$' && strcmp(argv1[1], "=") == 0 && argc1 >= 3) {
+        char new_var[1024] = "";
+        for (int j = 2; j < argc1; j++) {
+            strcat(new_var, argv1[j]);
+            strcat(new_var, " ");
+        }
+        setenv(argv1[0] + 1, new_var, 1);
         return 1;
     }
 
