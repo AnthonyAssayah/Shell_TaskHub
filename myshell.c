@@ -24,6 +24,8 @@ void handleOutputRedirect();
 
 int handleShellCommands();
 
+void resetGlobalVars();
+
 // signal handler for Ctrl-C
 void sigint_handler(int sig) {
     write(STDOUT_FILENO, "\nYou typed Control-C!\n", 22);
@@ -117,9 +119,17 @@ int main() {
         if (amper == 0) {
             retid = wait(&status);
         }
+
+        resetGlobalVars();
     }
 
     return 0;
+}
+
+void resetGlobalVars() {
+    memset(command, 0, MAX_LINE_LEN + 1);
+    amper = redirect = append = 0;
+    redirect_fd = STDOUT_FILENO;
 }
 
 int handleShellCommands() {
@@ -146,8 +156,6 @@ int handleShellCommands() {
 }
 
 void handleOutputRedirect() {
-    redirect = amper = append = 0;
-    redirect_fd = STDOUT_FILENO;
     int flag = 0;
     if (argc1 > 1) {
         if (!strcmp(argv1[argc1 - 2], ">")) {
