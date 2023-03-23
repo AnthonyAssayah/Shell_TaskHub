@@ -27,6 +27,12 @@ int handleShellCommands();
 
 void resetGlobalVars();
 
+int changeDir();
+
+int addVar();
+
+int echoShell();
+
 // signal handler for Ctrl-C
 void sigint_handler(int sig) {
     write(STDOUT_FILENO, "\nYou typed Control-C!\n", 22);
@@ -81,6 +87,7 @@ int main() {
         }
         command[strlen(command) - 1] = '\0';
 
+        // 6. Execute previous command
         if (strcmp(command, "!!") == 0) {
             strcpy(command, last_command); // strcpy(src, dest)
         } else {
@@ -172,52 +179,63 @@ int handleShellCommands() {
 
     // 3. Echo command
     if (strcmp(argv1[0], "echo") == 0) {
-        for (int j = 1; j < argc1; ++j) {
-            if (argv1[j][0] == '$') { // check if argument is a variable
-                if (strcmp(argv1[j], "$?") == 0) {
-                    printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
-                } else {
-                    char *var_value = getenv(argv1[j] + 1); // get the value of the variable
-                    if (var_value != NULL) {
-                        printf("%s ", var_value); // print the value of the variable
-                    }
-                }
-            } else {
-                printf("%s ", argv1[j]);
-            }
-        }
-        printf("\n");
-        return 1;
+        return echoShell();
     }
 
     // 5. Change dir
     if (strcmp(argv1[0], "cd") == 0) {
-        if (i < 2) {
-            printf("i = %d\n", i);
-            printf("cd: missing operand\n");
-            return 1;
-        } else if (chdir(argv1[1]) < 0) {
-            printf("cd: %s: No such file or directory\n", argv1[1]);
-            return 1;
-        }
-        // print current directory
-        char cwd[1024];
-        printf("%s \n", getcwd(cwd, sizeof(cwd)));
-        return 1;
+        return changeDir();
     }
 
-    // Add new variables
+    // 10. Add new variables
     if (argv1[0][0] == '$' && strcmp(argv1[1], "=") == 0 && argc1 >= 3) {
-        char new_var[1024] = "";
-        for (int j = 2; j < argc1; j++) {
-            strcat(new_var, argv1[j]);
-            strcat(new_var, " ");
-        }
-        setenv(argv1[0] + 1, new_var, 1);
-        return 1;
+        return addVar();
     }
 
     return 0;
+}
+
+int echoShell() {
+    for (int j = 1; j < argc1; ++j) {
+        if (argv1[j][0] == '$') { // check if argument is a variable
+            if (strcmp(argv1[j], "$?") == 0) {
+                printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
+            } else {
+                char *var_value = getenv(argv1[j] + 1); // get the value of the variable
+                if (var_value != NULL) {
+                    printf("%s ", var_value); // print the value of the variable
+                }
+            }
+        } else {
+            printf("%s ", argv1[j]);
+        }
+    }
+    printf("\n");
+    return 1;
+}
+
+int addVar() {
+    char new_var[MAX_LINE_LEN] = "";
+    for (int j = 2; j < argc1; j++) {
+        strcat(new_var, argv1[j]);
+        strcat(new_var, " ");
+    }
+    setenv(argv1[0] + 1, new_var, 1);
+    return 1;
+}
+
+int changeDir() {
+    if (i < 2) {
+        printf("i = %d\n", i);
+        printf("cd: missing operand\n");
+    } else if (chdir(argv1[1]) < 0) {
+        printf("cd: %s: No such file or directory\n", argv1[1]);
+    } else {
+        // print current directory
+        char cwd[MAX_LINE_LEN];
+        printf("%s \n", getcwd(cwd, sizeof(cwd)));
+    }
+    return 1;
 }
 
 void handleOutputRedirect() {
