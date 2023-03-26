@@ -13,7 +13,7 @@
 char command[MAX_LINE_LEN + 1];
 char last_command[MAX_LINE_LEN + 1] = ""; // initialize last_command as empty string
 char *outfile = NULL, *token;
-int i, fd, amper, redirect, retid, status, piping;
+int i, fd, amper, redirect, retid, status, piping, input_redirect;
 char *argv1[10], *argv2[10];
 int argc1, redirect_fd, append;
 char prompt[MAX_LINE_LEN + 1] = "hello:";
@@ -123,6 +123,8 @@ int main() {
             if (redirect) {
                 if (append) {
                     fd = open(outfile, O_WRONLY | O_CREAT | O_APPEND, 0660);
+                } else if (input_redirect) {
+                    fd = open(outfile, O_RDONLY, 0660);
                 } else {
                     fd = creat(outfile, 0660);
                 }
@@ -248,6 +250,9 @@ void handleOutputRedirect() {
         } else if (!strcmp(argv1[argc1 - 2], "2>")) { // redirect stderr
             redirect = flag = 1;
             redirect_fd = STDERR_FILENO;
+        } else if (!strcmp(argv1[argc1 - 2], "<")) {
+            redirect = flag = input_redirect = 1;
+            redirect_fd = STDIN_FILENO;
         }
     }
     if (flag) {
