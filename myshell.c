@@ -9,6 +9,18 @@
 #define MAX_LINE_LEN 1024
 #define WHITESPACE " \t\n\r"
 
+enum states {NEUTRAL, WANT_THEN, THEN_BLOCK};
+enum results {SUCCESS, FAIL};
+
+static int if_state = NEUTRAL;
+static int if_result = SUCCESS;
+static int last_stat = 0;
+
+int syn_err(char *);
+int is_control_command(char *);
+int do_control_command(char **);
+int ok_to_execute();
+
 // init global variables for shell
 char command[MAX_LINE_LEN + 1];
 char last_command[MAX_LINE_LEN + 1] = ""; // initialize last_command as empty string
@@ -21,6 +33,73 @@ sigjmp_buf jmpbuf;
 int fildes[2];
 
 
+int process(char **argv) {
+    int rv = 0;
+
+    if (argv[0] == NULL)
+        rv = 0;
+    else if (is_control_command(argv[0]))
+        rv = do_control_command(argv);
+  //  else if (ok_to_execute())
+     //   rv = execute(argv);
+    return rv;
+}
+
+int ok_to_execute() {
+    int rv = 1;
+
+    if (if_state == WANT_THEN) {
+        syn_err("then expected");
+        rv = 0;
+    } else if (if_state == THEN_BLOCK && if_result == SUCCESS)
+        rv = 1;
+    else if (if_state == THEN_BLOCK && if_result == FAIL)
+        rv = 0;
+    return rv;
+}
+
+int is_control_command(char * s) {
+    return (strcmp(s, "if") == 0 || strcmp(s, "then") == 0 || strcmp(s, "fi") == 0);
+}
+
+int do_control_command(char **) {
+    char *cmd = argv1[0];
+    int rv = -1;
+
+    if (strcmp(cmd, "if") == 0) {
+        if (if_state != NEUTRAL)
+            rv = syn_err("if unexpected");
+        else {
+            last_stat = process(argv1 + 1);
+            if_result = (last_stat == 0 ? SUCCESS : FAIL);
+            if_state = WANT_THEN;
+            rv = 0;
+        }
+    } else if (strcmp(cmd, "then") == 0) {
+        if (if_state != WANT_THEN)
+            rv = syn_err("then unexpected");
+        else {
+            if_state = THEN_BLOCK;
+            rv = 0;
+        }
+    } else if (strcmp(cmd, "fi") == 0) {
+        if (if_state != THEN_BLOCK)
+            rv = syn_err("fi unexpected");
+        else {
+            if_state = NEUTRAL;
+            rv = 0;
+        }
+    } //else
+    //    fatal("internal error processing:", cmd, 2);
+    return rv;
+}
+
+int syn_err(char *msg) {
+    if_state = NEUTRAL;
+    fprintf(stderr, "syntax error: %s\n", msg);
+    return -1;
+}
+
 void handleOutputRedirect();
 
 int handleShellCommands();
@@ -30,6 +109,8 @@ void resetGlobalVars();
 int changeDir();
 
 int addVar();
+
+int readShell();
 
 int echoShell();
 
@@ -194,6 +275,12 @@ int handleShellCommands() {
         return addVar();
     }
 
+    // 11. Read shell 
+    if (strcmp(argv1[0], "read") == 0) {
+        return readShell();
+    }
+
+
     return 0;
 }
 
@@ -225,6 +312,15 @@ int addVar() {
     setenv(argv1[0] + 1, new_var, 1);
     return 1;
 }
+
+int readShell() {
+    char input[1024];
+    fgets(input, 1024, stdin);
+    input[strlen(input) - 1] = '\0';
+    setenv(argv1[1], input, 1);
+    return 1;
+}
+  
 
 int changeDir() {
     if (i < 2) {
@@ -260,3 +356,5 @@ void handleOutputRedirect() {
         outfile = argv1[argc1 - 1];
     }
 }
+
+
