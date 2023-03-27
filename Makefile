@@ -1,12 +1,12 @@
 CC = gcc
 FLAGS = -Wall -g
 
-.PHONY: all
 all: myshell
 
 myshell: myshell.c
-	$(CC) $(FLAGS) $^ -o $@
+	$(CC) $(FLAGS) -o myshell myshell.c
 
 .PHONY: clean
 clean:
 	rm -rf *.o myshell
+	
