@@ -76,11 +76,12 @@ int main() {
     sigaction(SIGINT, &sa, NULL);
     sigsetjmp(jmpbuf, 1);
 
-    memset(command, 0, MAX_LINE_LEN + 1);
     memset(last_command, 0, MAX_LINE_LEN + 1);
     int return_value = 1;
 
     while (1) {
+        resetGlobalVars();
+
         if (getCommand() < 0) {
             break;
         }
@@ -102,7 +103,6 @@ int main() {
         } else if (return_value == CONTINUE_NEXT_ITER) {
             continue;
         }
-        resetGlobalVars();
     }
     return 0;
 }
