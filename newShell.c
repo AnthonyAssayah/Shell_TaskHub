@@ -70,21 +70,26 @@ void sigint_handler(int sig) {
 }
 
 int main() {
-    memset(command, 0, MAX_LINE_LEN + 1);
-    memset(last_command, 0, MAX_LINE_LEN + 1);
-    int return_value = 1;
-
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sigint_handler;
     sigaction(SIGINT, &sa, NULL);
     sigsetjmp(jmpbuf, 1);
 
+    memset(command, 0, MAX_LINE_LEN + 1);
+    memset(last_command, 0, MAX_LINE_LEN + 1);
+    int return_value = 1;
+
     while (1) {
         if (getCommand() < 0) {
             break;
         }
         parseCommand();
+
+        if (argv1[0] == NULL) {
+            continue;
+        }
+
         if (isControlCommand(argv1[0]) || okToExecute()) {
             return_value = processIfThen(argv1);
         } else {
@@ -95,7 +100,6 @@ int main() {
         } else if (return_value == CONTINUE_NEXT_ITER) {
             continue;
         }
-        forkProcess();
         resetGlobalVars();
     }
     return 0;
@@ -109,7 +113,7 @@ int processIfThen(char **args) {
     } else if (isControlCommand(args[0])) {
         rv = doControlCommand(args);
     } else if (okToExecute()) {
-        rv = execute(args);
+        rv = execute();
     }
     return (rv > 0);
 }
@@ -159,9 +163,6 @@ void parseCommand() {
 }
 
 int execute() {
-    if (argv1[0] == NULL) {
-        return CONTINUE_NEXT_ITER;
-    }
 
     if (strcmp(argv1[0], "quit") == 0) {
         return BREAK_LOOP;
@@ -177,6 +178,7 @@ int execute() {
     if (handleShellCommands()) {
         return CONTINUE_NEXT_ITER;
     }
+    forkProcess();
 
     return 1;
 }
