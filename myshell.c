@@ -9,14 +9,24 @@
 #define MAX_LINE_LEN 1024
 #define WHITESPACE " \t\n\r"
 
-enum states {NEUTRAL, WANT_THEN, THEN_BLOCK};
-enum results {SUCCESS, FAIL};
+enum states
+{
+    NEUTRAL,
+    WANT_THEN,
+    THEN_BLOCK,
+    ELSE_BLOCK
+};
+enum results
+{
+    SUCCESS,
+    FAIL
+};
 
-static int if_state = NEUTRAL;
-static int if_result = SUCCESS;
-static int last_stat = 0;
+int if_state = NEUTRAL;
+int if_result = SUCCESS;
+int last_stat = 0;
 
-int syn_err(char *);
+// int syn_err(char *);
 int is_control_command(char *);
 int do_control_command(char **);
 int ok_to_execute();
@@ -31,73 +41,147 @@ int argc1, redirect_fd, append;
 char prompt[MAX_LINE_LEN + 1] = "hello:";
 sigjmp_buf jmpbuf;
 int fildes[2];
+// extern curr_history;
 
 
-int process(char **argv) {
-    int rv = 0;
+int execute();
+int process(char **args);
+// if date | grep Fri\n then\n echo "Shabat Shalom"\n else\n echo "Hard way to go" fi\n
 
-    if (argv[0] == NULL)
-        rv = 0;
-    else if (is_control_command(argv[0]))
-        rv = do_control_command(argv);
-  //  else if (ok_to_execute())
-     //   rv = execute(argv);
-    return rv;
-}
-
-int ok_to_execute() {
-    int rv = 1;
-
-    if (if_state == WANT_THEN) {
-        syn_err("then expected");
-        rv = 0;
-    } else if (if_state == THEN_BLOCK && if_result == SUCCESS)
-        rv = 1;
-    else if (if_state == THEN_BLOCK && if_result == FAIL)
-        rv = 0;
-    return rv;
-}
-
-int is_control_command(char * s) {
-    return (strcmp(s, "if") == 0 || strcmp(s, "then") == 0 || strcmp(s, "fi") == 0);
-}
-
-int do_control_command(char **) {
+int do_contol_command(char **args)
+{
     char *cmd = argv1[0];
     int rv = -1;
 
-    if (strcmp(cmd, "if") == 0) {
+    if (strcmp(cmd, "if") == 0)
+    {
+        printf("enter do_control_command: IF \n");
         if (if_state != NEUTRAL)
-            rv = syn_err("if unexpected");
-        else {
-            last_stat = process(argv1 + 1);
-            if_result = (last_stat == 0 ? SUCCESS : FAIL);
+        {
+            printf("if unexpected\n");
+            rv = 1;
+        }
+        else
+        {
+            if_state = WANT_THEN;
+            printf("BEFORE process(args + 1) \n");
+            last_stat = process(args + 1);
+            printf("AFTER process(args + 1) \n");
+            if_result = (last_stat == 0) ? SUCCESS : FAIL;
             if_state = WANT_THEN;
             rv = 0;
         }
-    } else if (strcmp(cmd, "then") == 0) {
+    }
+    else if (strcmp(cmd, "then") == 0)
+    {
+        
+        printf("if_state = %d\n", if_state);
         if (if_state != WANT_THEN)
-            rv = syn_err("then unexpected");
-        else {
+        {
+            printf("then unexpected\n");
+            rv = 1;
+        }
+        else
+        {
+            printf("enter do_control_command: THEN BLOCK\n");
             if_state = THEN_BLOCK;
+            printf("if_state = %d\n", if_state);
             rv = 0;
         }
-    } else if (strcmp(cmd, "fi") == 0) {
+    }
+    else if (strcmp(cmd, "else") == 0)
+    {
+        printf("enter do control command: ELSE\n");
+        printf("if_state = %d\n", if_state);
         if (if_state != THEN_BLOCK)
-            rv = syn_err("fi unexpected");
-        else {
+        {
+            printf("else unexpected\n");
+            rv = 1;
+        }
+        else
+        {
+            if_state = ELSE_BLOCK;
+            rv = 0;
+        }
+    }
+    else if (strcmp(cmd, "fi") == 0)
+    {
+        printf("enter do control command: FI\n");
+        if (if_state != THEN_BLOCK && if_state != ELSE_BLOCK)
+        {
+            printf("fi unexpected\n");
+            rv = 1;
+        }
+        else
+        {
+            printf("enter do control else: FI\n");
             if_state = NEUTRAL;
             rv = 0;
         }
-    } //else
-    //    fatal("internal error processing:", cmd, 2);
+    }
+
     return rv;
 }
 
-int syn_err(char *msg) {
-    if_state = NEUTRAL;
-    fprintf(stderr, "syntax error: %s\n", msg);
-    return -1;
+int is_control_command(char *s)
+{
+    return (strcmp(s, "if") == 0 || strcmp(s, "then") == 0 || strcmp(s, "else") == 0 || strcmp(s, "fi") == 0);
+}
+
+int is_ok_execute()
+{
+    printf("enter is_ok_execute\n");
+    printf("if_state = %d\n", if_state);
+
+    int rv = 1;
+    if (if_state == WANT_THEN)
+    {
+        printf("if_state = %d\n", if_state);
+        rv = 0;
+    }
+    else if (if_state == THEN_BLOCK && if_result == SUCCESS)
+    {
+        printf("enter is_ok_execute: SUCCESS\n");
+        rv = 1;
+    }
+    else if (if_state == THEN_BLOCK && if_result == FAIL)
+    {
+        printf("enter is_ok_execute: FAIL\n");
+        rv = 0;
+    }
+    else if (if_state == ELSE_BLOCK && if_result == FAIL)
+    {
+        printf("enter is_ok_execute: FAIL\n");
+        rv = 1;
+    }
+    else if (if_state == ELSE_BLOCK && if_result == SUCCESS)
+    {
+        rv = 0;
+    }
+     printf("execute? %d %d\n",rv , if_result);
+    return rv;
+}
+
+int process(char **args)
+{
+    int rv = -1;
+    // do control command
+    if (args[0] == NULL)
+    {
+        rv = 0;
+    }
+    else if (is_control_command(args[0]))
+    {
+        printf("enter is control command\n");
+        rv = do_contol_command(args);
+    }
+    else if (is_ok_execute())
+    {
+        // 2- execute
+        rv = execute(args);
+    }
+
+    return rv;
 }
 
 void handleOutputRedirect();
@@ -149,7 +233,18 @@ void parseCommand() {
     }
 }
 
-int main() {
+// int getCommand() {
+//     int i = 0;
+//     char c;
+//     while ((c = getchar()) != '\n') {
+//         command[i++] = c;
+//     }
+//     command[i++] = c;
+//     command[i] = '\0';
+//     return i;
+// }
+
+int execute() {
     memset(command, 0, MAX_LINE_LEN + 1);
     memset(last_command, 0, MAX_LINE_LEN + 1);
 
@@ -163,6 +258,7 @@ int main() {
 
         printf("%s ", prompt);
 
+        // getCommand();
         if (!fgets(command, MAX_LINE_LEN, stdin)) {
             break;
         }
@@ -178,6 +274,10 @@ int main() {
 
         // get command line arguments
         parseCommand();
+
+         if (process(argv1) == -1) {
+            continue;
+        }
 
         /* Is command empty */
         if (argv1[0] == NULL) {
@@ -224,6 +324,7 @@ int main() {
                     /* stdout now goes to pipe */
                     /* child process does command */
                     execvp(argv1[0], argv1);
+                    exit(-1);
                 }
                 /* 2nd command component of command line */
                 close(STDIN_FILENO);
@@ -232,8 +333,10 @@ int main() {
                 close(fildes[1]);
                 /* standard input now comes from pipe */
                 execvp(argv2[0], argv2);
+                exit(-1);
             } else {
                 execvp(argv1[0], argv1);
+                exit(-1);
             }
         }
         /* parent continues here */
@@ -357,4 +460,6 @@ void handleOutputRedirect() {
     }
 }
 
-
+int main(){
+    execute();
+}
