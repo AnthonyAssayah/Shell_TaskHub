@@ -18,7 +18,7 @@ static int last_stat = 0;
 
 int syn_err(char *);
 int is_control_command(char *);
-int do_control_command(char **);
+int do_control_command();
 int ok_to_execute();
 
 // init global variables for shell
@@ -62,7 +62,7 @@ int is_control_command(char * s) {
     return (strcmp(s, "if") == 0 || strcmp(s, "then") == 0 || strcmp(s, "fi") == 0);
 }
 
-int do_control_command(char **) {
+int do_control_command() {
     char *cmd = argv1[0];
     int rv = -1;
 

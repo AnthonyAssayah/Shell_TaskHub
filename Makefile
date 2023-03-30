@@ -11,5 +11,5 @@ myshell: myshell.c
 
 .PHONY: clean
 clean:
-	rm -rf *.o myshell
+	rm -rf *.o myshell newShell
 	

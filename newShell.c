@@ -10,11 +10,11 @@
 #define WHITESPACE " \t\n\r"
 #define BREAK_LOOP -1
 #define CONTINUE_NEXT_ITER 0
-#define CONTINUE_CODE 1
 
 enum states {
     NEUTRAL, WANT_THEN, THEN_BLOCK
 };
+
 enum results {
     SUCCESS, FAIL
 };
@@ -22,6 +22,7 @@ enum results {
 static int if_state = NEUTRAL;
 static int if_result = SUCCESS;
 static int last_stat = 0;
+
 char command[MAX_LINE_LEN + 1];
 char last_command[MAX_LINE_LEN + 1] = ""; // initialize last_command as empty string
 char *outfile = NULL, *token;
@@ -54,6 +55,14 @@ int changeDir();
 
 void handleOutputRedirect();
 
+int processIfThen(char **args);
+
+int okToExecute();
+
+int isControlCommand(char *str);
+
+int doControlCommand(char **args);
+
 // signal handler for Ctrl-C
 void sigint_handler(int sig) {
     write(STDOUT_FILENO, "\nYou typed Control-C!\n", 22);
@@ -63,7 +72,7 @@ void sigint_handler(int sig) {
 int main() {
     memset(command, 0, MAX_LINE_LEN + 1);
     memset(last_command, 0, MAX_LINE_LEN + 1);
-    int return_value = 0;
+    int return_value = 1;
 
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -76,20 +85,34 @@ int main() {
             break;
         }
         parseCommand();
-        return_value = execute();
+        if (isControlCommand(argv1[0]) || okToExecute()) {
+            return_value = processIfThen(argv1);
+        } else {
+            return_value = execute();
+        }
         if (return_value == BREAK_LOOP) {
             break;
         } else if (return_value == CONTINUE_NEXT_ITER) {
             continue;
-        } else {
-            forkProcess();
-            resetGlobalVars();
         }
-
+        forkProcess();
+        resetGlobalVars();
     }
     return 0;
 }
 
+// Process user if/then command
+int processIfThen(char **args) {
+    int rv = 0;
+    if (args[0] == NULL) {
+        rv = CONTINUE_NEXT_ITER;
+    } else if (isControlCommand(args[0])) {
+        rv = doControlCommand(args);
+    } else if (okToExecute()) {
+        rv = execute(args);
+    }
+    return (rv > 0);
+}
 
 int getCommand() {
     printf("%s ", prompt);
@@ -139,6 +162,7 @@ int execute() {
     if (argv1[0] == NULL) {
         return CONTINUE_NEXT_ITER;
     }
+
     if (strcmp(argv1[0], "quit") == 0) {
         return BREAK_LOOP;
     }
@@ -154,7 +178,7 @@ int execute() {
         return CONTINUE_NEXT_ITER;
     }
 
-    return CONTINUE_CODE;
+    return 1;
 }
 
 void forkProcess() {
@@ -182,7 +206,7 @@ void forkProcess() {
                 close(fildes[1]);
                 close(fildes[0]);
                 /* stdout now goes to pipe */
-                /* child process does command */
+                /* child processIfThen does command */
                 execvp(argv1[0], argv1);
             }
             /* 2nd command component of command line */
@@ -234,8 +258,6 @@ int handleShellCommands() {
     if (strcmp(argv1[0], "read") == 0) {
         return readShell();
     }
-
-
     return 0;
 }
 
@@ -309,5 +331,57 @@ void handleOutputRedirect() {
     if (flag) {
         argv1[argc1 - 2] = NULL;
         outfile = argv1[argc1 - 1];
+    }
+}
+
+// Determine how the command should be executed
+int okToExecute() {
+    if (if_state == WANT_THEN) {
+        // todo: expected then!
+        return 0;
+    } else if (if_state == THEN_BLOCK && if_result == SUCCESS) {
+        return 1;
+    } else if (if_state == THEN_BLOCK && if_result == FAIL) {
+        return 0;
+    }
+    return 1;
+}
+
+// check for if/then command (returns 0 or 1)
+int isControlCommand(char *str) {
+    return (!strcmp(str, "if") || !strcmp(str, "then") || !strcmp(str, "fi"));
+}
+
+int doControlCommand(char **args) {
+    char *cmd = args[0];
+    if (!strcmp(cmd, "if")) {
+        if (if_state != NEUTRAL) {
+            // todo: error- unexpected if
+            return -1;
+        } else {
+            last_stat = processIfThen(args + 1);
+            if_result = last_stat == 0 ? SUCCESS : FAIL;
+            if_state = WANT_THEN;
+            return 0;
+        }
+    } else if (!strcmp(cmd, "then")) {
+        if (if_state != WANT_THEN) {
+            // todo: error - unexpected then
+            return -1;
+        } else {
+            if_state = THEN_BLOCK;
+            return 0;
+        }
+    } else if (!strcmp(cmd, "fi")) {
+        if (if_state != THEN_BLOCK) {
+            // todo: error - unexpected fi
+            return -1;
+        } else {
+            if_state = NEUTRAL;
+            return 0;
+        }
+    } else {
+        // todo: fatal
+        return -1;
     }
 }
