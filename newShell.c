@@ -88,6 +88,8 @@ int main() {
 
         if (argv1[0] == NULL) {
             continue;
+        } else if (strcmp(argv1[0], "quit") == 0) {
+            break;
         }
 
         if (isControlCommand(argv1[0]) || okToExecute()) {
@@ -108,9 +110,7 @@ int main() {
 // Process user if/then command
 int processIfThen(char **args) {
     int rv = 0;
-    if (args[0] == NULL) {
-        rv = CONTINUE_NEXT_ITER;
-    } else if (isControlCommand(args[0])) {
+    if (isControlCommand(args[0])) {
         rv = doControlCommand(args);
     } else if (okToExecute()) {
         rv = execute();
@@ -163,10 +163,6 @@ void parseCommand() {
 }
 
 int execute() {
-
-    if (strcmp(argv1[0], "quit") == 0) {
-        return BREAK_LOOP;
-    }
 
     if (!strcmp(argv1[argc1 - 1], "&")) {
         amper = 1;
