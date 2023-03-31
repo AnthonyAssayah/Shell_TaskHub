@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <setjmp.h>
+#include "history.h"
 
 #define MAX_LINE_LEN 1024
 #define WHITESPACE " \t\n\r"
@@ -30,8 +31,9 @@ int i, fd, amper, redirect, retid, status, piping, input_redirect;
 char *argv1[10], *argv2[10];
 int argc1, redirect_fd, append;
 char prompt[MAX_LINE_LEN + 1] = "hello:";
-sigjmp_buf jmpbuf;
+sigjmp_buf jmpbuf, sigtstp_jmpbuf;
 int fildes[2];
+struct History history;
 
 int getCommand();
 
@@ -69,15 +71,26 @@ void sigint_handler(int sig) {
     siglongjmp(jmpbuf, 1);
 }
 
+// signal handler for Ctrl-Z
+void sigtstp_handler(int sig) {
+    freeHistory(&history);
+    siglongjmp(sigtstp_jmpbuf, 1);
+}
+
 int main() {
-    struct sigaction sa;
+    struct sigaction sa, sigtstp_sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = sigint_handler;
     sigaction(SIGINT, &sa, NULL);
     sigsetjmp(jmpbuf, 1);
+    // Ctrl-Z sigaction
+    memset(&sigtstp_sa, 0, sizeof(sigtstp_sa));
+    sigtstp_sa.sa_handler = sigtstp_handler;
+    sigaction(SIGTSTP, &sigtstp_sa, NULL);
 
     memset(last_command, 0, MAX_LINE_LEN + 1);
     int return_value = 1;
+    initHistory(&history, 20);
 
     while (1) {
         resetGlobalVars();
@@ -85,6 +98,7 @@ int main() {
         if (getCommand() < 0) {
             break;
         }
+        addHistoryEntry(&history, command);
         parseCommand();
 
         if (argv1[0] == NULL) {
@@ -104,6 +118,8 @@ int main() {
             continue;
         }
     }
+    freeHistory(&history);
+    sigsetjmp(sigtstp_jmpbuf, 0);
     return 0;
 }
 
@@ -256,6 +272,12 @@ int handleShellCommands() {
     if (strcmp(argv1[0], "read") == 0) {
         return readShell();
     }
+
+    if (!strcmp(argv1[argc1 - 1], "history")) {
+        printHistory(&history);
+        return 1;
+    }
+
     return 0;
 }
 

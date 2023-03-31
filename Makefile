@@ -1,15 +1,13 @@
 CC = gcc
 FLAGS = -Wall -g
 
-all: myshell newShell
+.PHONY: all
+all: newShell
 
-newShell: newShell.c
-	$(CC) $(FLAGS) -o newShell newShell.c
+newShell: newShell.c history.h history.c
+	$(CC) $(FLAGS) $< history.c -o $@
 
-myshell: myshell.c
-	$(CC) $(FLAGS) -o myshell myshell.c
 
 .PHONY: clean
 clean:
 	rm -rf *.o myshell newShell
-	
