@@ -3,6 +3,8 @@
 #include <string.h>
 #include "history.h"
 
+// source: https://stackoverflow.com/questions/22289428/making-a-simple-history-function-in-c-shell-program
+
 void initHistory(struct History *h, int capacity) {
     h->capacity = capacity;
     h->cmd_history = malloc(capacity * sizeof(char *));
