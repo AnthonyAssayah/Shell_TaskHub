@@ -12,17 +12,6 @@
 #define BREAK_LOOP -1
 #define CONTINUE_NEXT_ITER 0
 
-enum states {
-    NEUTRAL, WANT_THEN, THEN_BLOCK
-};
-
-enum results {
-    SUCCESS, FAIL
-};
-
-static int if_state = NEUTRAL;
-static int if_result = SUCCESS;
-static int last_stat = 0;
 
 char command[MAX_LINE_LEN + 1];
 char last_command[MAX_LINE_LEN + 1] = ""; // initialize last_command as empty string
@@ -36,34 +25,19 @@ int fildes[2];
 struct History history;
 
 int getCommand();
-
-void parseCommand();
-
+void parseCommand(char *command);
 int execute();
-
-void forkProcess();
-
+int forkProcess();
 void resetGlobalVars();
-
 int handleShellCommands();
-
 int echoShell();
-
 int addVar();
-
 int readShell();
-
 int changeDir();
-
 void handleOutputRedirect();
+int handle_arrows();
+int ifThen();
 
-int processIfThen(char **args);
-
-int okToExecute();
-
-int isControlCommand(char *str);
-
-int doControlCommand(char **args);
 
 // signal handler for Ctrl-C
 void sigint_handler(int sig) {
@@ -71,68 +45,6 @@ void sigint_handler(int sig) {
     siglongjmp(jmpbuf, 1);
 }
 
-// signal handler for Ctrl-Z
-void sigtstp_handler(int sig) {
-    freeHistory(&history);
-    siglongjmp(sigtstp_jmpbuf, 1);
-}
-
-int main() {
-    struct sigaction sa, sigtstp_sa;
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = sigint_handler;
-    sigaction(SIGINT, &sa, NULL);
-    sigsetjmp(jmpbuf, 1);
-    // Ctrl-Z sigaction
-    memset(&sigtstp_sa, 0, sizeof(sigtstp_sa));
-    sigtstp_sa.sa_handler = sigtstp_handler;
-    sigaction(SIGTSTP, &sigtstp_sa, NULL);
-
-    memset(last_command, 0, MAX_LINE_LEN + 1);
-    int return_value = 1;
-    initHistory(&history, 20);
-
-    while (1) {
-        resetGlobalVars();
-
-        if (getCommand() < 0) {
-            break;
-        }
-        addHistoryEntry(&history, command);
-        parseCommand();
-
-        if (argv1[0] == NULL) {
-            continue;
-        } else if (strcmp(argv1[0], "quit") == 0) {
-            break;
-        }
-
-        if (isControlCommand(argv1[0]) || okToExecute()) {
-            return_value = processIfThen(argv1);
-        } else {
-            return_value = execute();
-        }
-        if (return_value == BREAK_LOOP) {
-            break;
-        } else if (return_value == CONTINUE_NEXT_ITER) {
-            continue;
-        }
-    }
-    freeHistory(&history);
-    sigsetjmp(sigtstp_jmpbuf, 0);
-    return 0;
-}
-
-// Process user if/then command
-int processIfThen(char **args) {
-    int rv = 0;
-    if (isControlCommand(args[0])) {
-        rv = doControlCommand(args);
-    } else if (okToExecute()) {
-        rv = execute();
-    }
-    return (rv > 0);
-}
 
 int getCommand() {
     printf("%s ", prompt);
@@ -149,9 +61,10 @@ int getCommand() {
     return 1;
 }
 
-void parseCommand() {
+void parseCommand(char *command) {
     /* parse command line */
     i = 0;
+    piping = 0;
     token = strtok(command, WHITESPACE);
     while (token != NULL) {
         argv1[i++] = token;
@@ -180,22 +93,23 @@ void parseCommand() {
 
 int execute() {
 
-    if (!strcmp(argv1[argc1 - 1], "&")) {
-        amper = 1;
-        argv1[argc1 - 1] = NULL;
-    }
-
     handleOutputRedirect();
-
-    if (handleShellCommands()) {
-        return CONTINUE_NEXT_ITER;
+ 
+    if (handleShellCommands() ) {
+ 
+        return 1;
     }
-    forkProcess();
+    if (forkProcess()) {
+   
+        return 1;
+    }
 
+ 
     return 1;
 }
 
-void forkProcess() {
+int forkProcess() {
+   
     /* for commands not part of the shell command language */
     if (fork() == 0) {
         /* redirection of IO */
@@ -211,17 +125,19 @@ void forkProcess() {
             dup(fd);
             close(fd);
         }
-        if (piping) {
+        if (piping) {   
+                           // ls - l | wc - l | wc - l | > output.txt 
             pipe(fildes);
             if (fork() == 0) {
                 /* first component of command line */
                 close(STDOUT_FILENO);
                 dup(fildes[1]);
                 close(fildes[1]);
-                close(fildes[0]);
-                /* stdout now goes to pipe */
-                /* child processIfThen does command */
-                execvp(argv1[0], argv1);
+                    close(fildes[0]);
+                    /* stdout now goes to pipe */
+                    /* child processIfThen does command */
+                    execvp(argv1[0], argv1);
+                    exit(0);
             }
             /* 2nd command component of command line */
             close(STDIN_FILENO);
@@ -230,14 +146,19 @@ void forkProcess() {
             close(fildes[1]);
             /* standard input now comes from pipe */
             execvp(argv2[0], argv2);
+            exit(0);
+        
         } else {
+            // printf("enter in else exec\n");
             execvp(argv1[0], argv1);
+            exit(0);
         }
     }
     /* parent continues here */
     if (amper == 0) {
         retid = wait(&status);
     }
+    return 1;
 }
 
 void resetGlobalVars() {
@@ -273,16 +194,80 @@ int handleShellCommands() {
         return readShell();
     }
 
-    if (!strcmp(argv1[argc1 - 1], "history")) {
-        printHistory(&history);
-        return 1;
+    // 12. IfThen
+    if (!strcmp(argv1[0], "if")) {
+        return ifThen();
     }
 
     return 0;
 }
 
+int ifThen(){
+        int j = 1;
+        while (argv1[j] != NULL) {
+            argv1[j-1] = argv1[j];
+            j++;
+        }
+        argv1[j-1] = NULL;
+
+        execute();
+        int currstatus = WEXITSTATUS(status);//(args);
+
+        char condition[MAX_LINE_LEN];
+        if(!currstatus){
+            if (fgets(condition, 1024, stdin) != NULL) {
+                condition[strlen(condition) - 1] = '\0';
+                if (!strcmp(condition,"then")){
+                    if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
+                        condition[strlen(condition) - 1] = '\0';
+                        int elseFlag = 1;
+                        while(strcmp(condition, "fi")){
+                            if(!strcmp(condition, "else")){
+                                elseFlag = 0;
+                            }
+                            if(elseFlag){
+                                parseCommand(condition);
+                                execute();
+                            }
+                            if (fgets(condition, 1024, stdin) == NULL) {
+                                break;
+                            }
+                            condition[strlen(condition) - 1] = '\0';
+                        }
+                    }
+                }
+                else{
+                    printf("Bad if statement\n");
+                    return 0;
+                }
+            }
+        }
+        else{
+            if (fgets(condition, 1024, stdin) != NULL) {
+                condition[strlen(condition) - 1] = '\0';
+                while(strcmp(condition, "else")){
+                        if (fgets(condition, 1024, stdin) == NULL) {
+                            break;
+                        }
+                        condition[strlen(condition) - 1] = '\0';
+                    }
+                while(strcmp(condition, "fi")){
+                        parseCommand(condition);
+                        execute();
+                        if (fgets(condition, 1024, stdin) == NULL) {
+                            break;
+                        }
+                        condition[strlen(condition) - 1] = '\0';
+                    }
+            }
+        }
+        return 1;
+    }
+
+
 int echoShell() {
-    for (int j = 1; j < argc1; ++j) {
+    int j = 1;
+    while (argv1[j] != NULL) {
         if (argv1[j][0] == '$') { // check if argument is a variable
             if (strcmp(argv1[j], "$?") == 0) {
                 printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
@@ -294,7 +279,10 @@ int echoShell() {
             }
         } else {
             printf("%s ", argv1[j]);
+    
         }
+        j++;
+
     }
     printf("\n");
     return 1;
@@ -321,7 +309,6 @@ int readShell() {
 
 int changeDir() {
     if (i < 2) {
-        printf("i = %d\n", i);
         printf("cd: missing operand\n");
     } else if (chdir(argv1[1]) < 0) {
         printf("cd: %s: No such file or directory\n", argv1[1]);
@@ -334,6 +321,7 @@ int changeDir() {
 }
 
 void handleOutputRedirect() {
+
     int flag = 0;
     if (argc1 > 1) {
         if (!strcmp(argv1[argc1 - 2], ">")) {
@@ -352,56 +340,173 @@ void handleOutputRedirect() {
         argv1[argc1 - 2] = NULL;
         outfile = argv1[argc1 - 1];
     }
+    
 }
 
-// Determine how the command should be executed
-int okToExecute() {
-    if (if_state == WANT_THEN) {
-        // todo: expected then!
-        return 0;
-    } else if (if_state == THEN_BLOCK && if_result == SUCCESS) {
-        return 1;
-    } else if (if_state == THEN_BLOCK && if_result == FAIL) {
-        return 0;
-    }
-    return 1;
-}
 
-// check for if/then command (returns 0 or 1)
-int isControlCommand(char *str) {
-    return (!strcmp(str, "if") || !strcmp(str, "then") || !strcmp(str, "fi"));
-}
+// int handle_arrows()
+// {
+//     int current_index = (history.last_index - 1) % history.capacity;
+//     printf("history.cmd_history[current_index] = %s\n", history.cmd_history[current_index]);
+//     printf("current_index = %d\n", current_index);
+//     printf("history.last_index = %d\n", history.last_index);
+//     printf("argc1 = %d\n", argc1);
+//     printf("argv1[0][2] = %c\n", argv1[0][2]);
 
-int doControlCommand(char **args) {
-    char *cmd = args[0];
-    if (!strcmp(cmd, "if")) {
-        if (if_state != NEUTRAL) {
-            // todo: error- unexpected if
-            return -1;
-        } else {
-            last_stat = processIfThen(args + 1);
-            if_result = last_stat == 0 ? SUCCESS : FAIL;
-            if_state = WANT_THEN;
-            return 0;
+//     int ans = 0;
+//     if ((argc1 == 1) && (history.cmd_history[current_index] != NULL) && (argv1[0][2] == 'A' || argv1[0][2] == 'B'))
+//     {
+//         printf("\033[1A"); // line up
+//         printf("\x1b[2K"); // delete line
+//         // printf("%s ", prompt);
+//         printf("%s", history.cmd_history[current_index]);
+//         ans = 1;
+//         int c = 0;
+//         while (c != 'Q' && c != '\n')
+//         {
+//             c = getchar();
+
+//             if (c == '\033')
+//             {
+//                 // printf("\033[1A"); // line up
+//                 printf("\x1b[2K"); // delete line 
+//                 getchar();         // remove [
+//                 switch (getchar())
+//                 {
+//                 case 'A': /* UP arrow */
+//                     if (getchar() == '\n')
+//                     {
+//                         if (current_index == (history.first_index - 1 + history.capacity) % history.capacity)
+//                         {
+//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
+//                             printf("%s", history.cmd_history[current_index % history.capacity]);
+//                         }
+//                         else
+//                         {
+//                             current_index = (current_index - 1 + history.capacity) % history.capacity; 
+//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
+//                             printf("%s", history.cmd_history[current_index % history.capacity]);
+//                         }
+//                     }
+//                     break;
+
+//                 case 'B': /* DOWN arrow*/
+//                     if (getchar() == '\n')
+//                     {
+//                         if (current_index == (history.last_index - 1 + history.capacity) % history.capacity)
+//                         {
+//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
+//                             printf("%s", history.cmd_history[current_index % history.capacity]);
+//                         }
+//                         else
+//                         {
+//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
+//                             current_index = (current_index + 1) % history.capacity;
+//                             printf("%s", history.cmd_history[current_index % history.capacity]);
+//                         }
+//                     }
+//                     break;
+//                 default:
+//                     break;
+//                 }
+//             }
+//               else if (c == '\n') /* if the user press Enter - repeat the command*/
+//             {
+//                 memset(command, 0, sizeof(command));
+//                 strcpy(command, history.cmd_history[current_index]);
+//                 // printf("after strcpy command = %s\n", command);
+//                 handleShellCommands();
+//                 // printf("after execute command = %s\n", command);
+//                 fflush(stdout);
+//                 current_index = (history.last_index - 1) % 20;
+//                 printf("%s", history.cmd_history[current_index]);
+//             }
+//         }
+//     }
+//     return ans;
+    
+// }
+
+
+int handle_arrows()
+{
+    static int history_index = -1;
+
+    if (argc1 == 1 && (argv1[0][2] == 'A' || argv1[0][2] == 'B')) {
+        // If arrow up or arrow down key is pressed
+        if (argv1[0][2] == 'A' && history_index < history.cmd_count - 1) {
+            // Move up in history
+            history_index++;
+        } else if (argv1[0][2] == 'B' && history_index > -1) {
+            // Move down in history
+            history_index--;
         }
-    } else if (!strcmp(cmd, "then")) {
-        if (if_state != WANT_THEN) {
-            // todo: error - unexpected then
-            return -1;
-        } else {
-            if_state = THEN_BLOCK;
-            return 0;
-        }
-    } else if (!strcmp(cmd, "fi")) {
-        if (if_state != THEN_BLOCK) {
-            // todo: error - unexpected fi
-            return -1;
-        } else {
-            if_state = NEUTRAL;
-            return 0;
+        
+        // If a valid history entry is selected, replace the current command with the selected command
+        if (history_index >= 0 && history_index < history.cmd_count) {
+            // Delete the current line
+            printf("\033[1A");
+            printf("\x1b[2K");
+            
+            int cmd_idx = (history.last_index - 1 - history_index + history.capacity) % history.capacity;
+            strncpy(command, history.cmd_history[cmd_idx], MAX_LINE_LEN);
+            printf("%s", command);
         }
     } else {
-        // todo: fatal
-        return -1;
+        // Reset history index when a new command is entered
+        history_index = -1;
     }
+    
+    return 0;
 }
+
+
+
+int main(){
+   
+    // Ctrl-C sigaction
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = sigint_handler;
+    sigaction(SIGINT, &sa, NULL);
+    sigsetjmp(jmpbuf, 1);
+
+
+    memset(last_command, 0, MAX_LINE_LEN + 1);
+    initHistory(&history, 20);
+    
+
+    while (1) {
+        resetGlobalVars();
+
+        if (getCommand() < 0) {
+            break;
+        }
+        addHistoryEntry(&history, command);
+        parseCommand(command);
+
+        
+        handle_arrows();
+        
+
+        if (argv1[0] == NULL) {
+            continue;
+        } else if (strcmp(argv1[0], "quit") == 0) {
+            break;
+        }
+
+
+        if (!strcmp(argv1[argc1 - 1], "&")) {
+            amper = 1;
+            argv1[argc1 - 1] = NULL;
+        }
+
+
+        execute();
+  
+    }
+    freeHistory(&history);
+    sigsetjmp(sigtstp_jmpbuf, 0);
+    return 0;
+}
+
