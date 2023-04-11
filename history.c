@@ -9,28 +9,35 @@ void initHistory(struct History *h, int capacity) {
     for (int i = 0; i < capacity; ++i) {
         h->cmd_history[i] = NULL;
     }
+    h->start_idx = 0;
+    h->cmd_count = 0;
 }
 
 void addHistoryEntry(struct History *h, char *command) {
-    if (h->cmd_history[h->start_idx] != NULL) {
-        free(h->cmd_history[h->start_idx]);
+    if (h->cmd_history[h->last_index] != NULL) {
+        free(h->cmd_history[h->last_index]);
     }
-    h->cmd_history[h->start_idx] = strdup(command);
-    h->start_idx = (h->start_idx + 1) % h->capacity;
+    h->cmd_history[h->last_index] = strdup(command);
+    h->last_index = (h->last_index + 1) % h->capacity;
+    if (h->cmd_count < h->capacity) {
+        h->cmd_count++;
+    } else {
+        h->first_index = (h->first_index + 1) % h->capacity;
+    }
 }
 
 void printHistory(struct History *h) {
     char *curr_line;
-    int curr_idx = h->start_idx;
-    for (int i = 0; i < h->capacity; ++i) {
+    int curr_idx = h->last_index;
+    for (int i = 0; i < h->cmd_count; ++i) {
         curr_line = h->cmd_history[curr_idx];
         if (curr_line != NULL) {
-            printf("%s\n", curr_line);
+            printf("%d: %s\n", h->cmd_count - i, curr_line);
         }
-        ++curr_idx;
-        curr_idx = curr_idx >= h->capacity ? 0 : curr_idx;
+        curr_idx = (curr_idx - 1 + h->capacity) % h->capacity;
     }
 }
+
 
 void freeHistory(struct History *h) {
     for (int i = 0; i < h->capacity; ++i) {

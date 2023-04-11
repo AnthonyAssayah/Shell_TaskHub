@@ -7,38 +7,45 @@ int main()
 
 	while (( c=getchar()) != 'Q')
 	{
+		
 		if (c == '\033')
 		{
+			
+			
 			//these two strange prints are from:
 			//https://itnext.io/overwrite-previously-printed-lines-4218a9563527
 			//and they delete the previous line
 			printf("\033[1A");//line up
 			printf("\x1b[2K");//delete line
-			printf("got an arrow ");
+		
 			getchar(); //skip the [
+				
 			switch(getchar()) { // the real value
+			
 			case 'A':
-			    // code for arrow up
-			    printf("up\n");
+				if( getchar() == '\n') {
+					 if (history_index > 0) {
+							history_index--;
+						}
+				}
 			    break;
 			case 'B':
-			    // code for arrow down
-			    printf("down\n");
+			    if (getchar() == '\n') {
+					  if (history_index < history.capacity - 1 && history.cmd_history[history_index + 1] != NULL) {
+							history_index++;
+						}	
+				}
 			    break;
-			case 'C':
-			    // code for arrow right
-			    printf("right\n");
-			    break;
-			case 'D':
-			    // code for arrow left
-			    printf("left\n");
+			case default:
 			    break;
     			}
 			
 		}
-		else
+		else if (c == '\n')
 		{
-			printf("char %3d is %c code %d\n", n++,c,c);
+			strcpy(command, history.cmd_history[history_index]);
+			printf("\r%s", command); // print the last command
+			fflush(stdout);
 		}
 	}
 

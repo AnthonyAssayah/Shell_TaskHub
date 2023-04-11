@@ -5,6 +5,9 @@ struct History {
     char **cmd_history;
     int capacity;
     int start_idx;
+    int cmd_count;
+    int last_index;
+    int first_index;
 };
 
 void initHistory(struct History *h, int capacity);
