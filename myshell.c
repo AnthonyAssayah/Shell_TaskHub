@@ -200,67 +200,79 @@ int handleShellCommands() {
     return 0;
 }
 
+#define MAX_COMMANDS 100
+
 int ifThen(){
-        int j = 1;
-        while (argv1[j] != NULL) {
-            argv1[j-1] = argv1[j];
-            j++;
-        }
-        argv1[j-1] = NULL;
+    char *commands[MAX_COMMANDS];
+    int commandCount = 0;
 
-        execute();
-        int currstatus = WEXITSTATUS(status);//(args);
-
-        char condition[MAX_LINE_LEN];
-        if(!currstatus){
-            if (fgets(condition, 1024, stdin) != NULL) {
-                condition[strlen(condition) - 1] = '\0';
-                if (!strcmp(condition,"then")){
-                    if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
-                        condition[strlen(condition) - 1] = '\0';
-                        int elseFlag = 1;
-                        while(strcmp(condition, "fi")){
-                            if(!strcmp(condition, "else")){
-                                elseFlag = 0;
-                            }
-                            if(elseFlag){
-                                parseCommand(condition);
-                                execute();
-                            }
-                            if (fgets(condition, 1024, stdin) == NULL) {
-                                break;
-                            }
-                            condition[strlen(condition) - 1] = '\0';
-                        }
-                    }
-                }
-                else{
-                    printf("Bad if statement\n");
-                    return 0;
-                }
-            }
-        }
-        else{
-            if (fgets(condition, 1024, stdin) != NULL) {
-                condition[strlen(condition) - 1] = '\0';
-                while(strcmp(condition, "else")){
-                        if (fgets(condition, 1024, stdin) == NULL) {
-                            break;
-                        }
-                        condition[strlen(condition) - 1] = '\0';
-                    }
-                while(strcmp(condition, "fi")){
-                        parseCommand(condition);
-                        execute();
-                        if (fgets(condition, 1024, stdin) == NULL) {
-                            break;
-                        }
-                        condition[strlen(condition) - 1] = '\0';
-                    }
-            }
-        }
-        return 1;
+    int j = 1;
+    while (argv1[j] != NULL) {
+        argv1[j-1] = argv1[j];
+        j++;
     }
+    argv1[j-1] = NULL;
+
+    execute();
+    int currstatus = WEXITSTATUS(status);//(args);
+
+    char condition[MAX_LINE_LEN];
+    if(!currstatus){
+        if (fgets(condition, 1024, stdin) != NULL) {
+            condition[strlen(condition) - 1] = '\0';
+            if (!strcmp(condition,"then")){
+                if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
+                    condition[strlen(condition) - 1] = '\0';
+                    int elseFlag = 1;
+                    while(strcmp(condition, "fi")){
+                        if(!strcmp(condition, "else")){
+                            elseFlag = 0;
+                        }
+                        if(elseFlag){
+                            commands[commandCount++] = strdup(condition);
+                        }
+                        if (fgets(condition, 1024, stdin) == NULL) {
+                            break;
+                        }
+                        condition[strlen(condition) - 1] = '\0';
+                    }
+                }
+            }
+            else{
+                printf("Bad if statement\n");
+                return 0;
+            }
+        }
+    }
+    else{
+        if (fgets(condition, 1024, stdin) != NULL) {
+            condition[strlen(condition) - 1] = '\0';
+            while(strcmp(condition, "else")){
+                    if (fgets(condition, 1024, stdin) == NULL) {
+                        break;
+                    }
+                    condition[strlen(condition) - 1] = '\0';
+                }
+            while(strcmp(condition, "fi")){
+                    commands[commandCount++] = strdup(condition);
+                    if (fgets(condition, 1024, stdin) == NULL) {
+                        break;
+                    }
+                    condition[strlen(condition) - 1] = '\0';
+                }
+        }
+    }
+
+    for (int i = 0; i < commandCount; i++) {
+        parseCommand(commands[i]);
+        execute();
+        free(commands[i]);
+    }
+
+    return 1;
+}
+
+
 
 int echoShell() {
     int j = 1;
