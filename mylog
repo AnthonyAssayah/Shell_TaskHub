@@ -1,0 +1,17 @@
+ls: cannot access '–l': No such file or directory
+ls: cannot access 'nofile': No such file or directory
+total 160
+-rwxrwxrwx 1 anthony19 anthony19   194 Apr  2 11:37 Makefile
+-rwxrwxrwx 1 anthony19 anthony19   801 Apr  7  2023 file
+-rwxrwxrwx 1 anthony19 anthony19  1371 Apr  3 21:37 history.c
+-rwxrwxrwx 1 anthony19 anthony19   438 Apr  3 16:33 history.h
+-rwxrwxrwx 1 anthony19 anthony19  1250 Apr  3 11:10 key.c
+-rwxrwxrwx 1 anthony19 anthony19   106 Apr  7  2023 mylog
+-rwxrwxrwx 1 anthony19 anthony19 11682 Mar 30 19:01 myshell.c
+-rwxrwxrwx 1 anthony19 anthony19 36080 Apr  7 18:13 newShell
+-rwxrwxrwx 1 anthony19 anthony19 22441 Apr  7 18:13 newShell.c
+-rwxrwxrwx 1 anthony19 anthony19  7328 Mar 26 21:35 shell.c
+-rwxrwxrwx 1 anthony19 anthony19  1830 Apr  3 18:32 shell1.c
+-rwxrwxrwx 1 anthony19 anthony19  1523 Mar 26 21:35 shell2.c
+-rwxrwxrwx 1 anthony19 anthony19  3328 Mar 26 21:35 shell3.c
+-rwxrwxrwx 1 anthony19 anthony19 54501 Mar 26 19:37 task1.pdf
