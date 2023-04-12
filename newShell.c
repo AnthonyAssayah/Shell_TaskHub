@@ -9,12 +9,11 @@
 
 #define MAX_LINE_LEN 1024
 #define WHITESPACE " \t\n\r"
-#define BREAK_LOOP -1
-#define CONTINUE_NEXT_ITER 0
 
 
 char command[MAX_LINE_LEN + 1];
-char last_command[MAX_LINE_LEN + 1] = ""; // initialize last_command as empty string
+char last_command[MAX_LINE_LEN + 1] = ""; 
+char tmp_command[MAX_LINE_LEN + 1];
 char *outfile = NULL, *token;
 int i, fd, amper, redirect, retid, status, piping, input_redirect;
 char *argv1[10], *argv2[10];
@@ -22,7 +21,7 @@ int argc1, redirect_fd, append;
 char prompt[MAX_LINE_LEN + 1] = "hello:";
 sigjmp_buf jmpbuf, sigtstp_jmpbuf;
 int fildes[2];
-struct History history;
+shell_history history;
 
 int getCommand();
 void parseCommand(char *command);
@@ -35,7 +34,7 @@ int addVar();
 int readShell();
 int changeDir();
 void handleOutputRedirect();
-int handle_arrows();
+int handle_arrows(shell_history* history, char *command);
 int ifThen();
 
 
@@ -45,7 +44,7 @@ void sigint_handler(int sig) {
     siglongjmp(jmpbuf, 1);
 }
 
-
+/*get the command from the user*/
 int getCommand() {
     printf("%s ", prompt);
     if (!fgets(command, MAX_LINE_LEN, stdin)) {
@@ -61,6 +60,7 @@ int getCommand() {
     return 1;
 }
 
+/*parse the command*/
 void parseCommand(char *command) {
     /* parse command line */
     i = 0;
@@ -91,22 +91,19 @@ void parseCommand(char *command) {
     }
 }
 
+/*execute the command*/
 int execute() {
-
     handleOutputRedirect();
  
     if (handleShellCommands() ) {
- 
         return 1;
     }
     if (forkProcess()) {
-   
         return 1;
     }
-
- 
     return 1;
 }
+
 
 int forkProcess() {
    
@@ -167,34 +164,35 @@ void resetGlobalVars() {
     redirect_fd = STDOUT_FILENO;
 }
 
+/*handle the shell commands*/
 int handleShellCommands() {
-    // 2. Change prompt
+    // Change prompt
     if (argc1 == 3 && strcmp(argv1[0], "prompt") == 0 && strcmp(argv1[1], "=") == 0) {
         strcpy(prompt, argv1[2]);
         return 1;
     }
 
-    // 3. Echo command
+    // Echo command
     if (strcmp(argv1[0], "echo") == 0) {
         return echoShell();
     }
 
-    // 5. Change dir
+    // Change dir
     if (strcmp(argv1[0], "cd") == 0) {
         return changeDir();
     }
 
-    // 10. Add new variables
+    // Add new variables
     if (argv1[0][0] == '$' && strcmp(argv1[1], "=") == 0 && argc1 >= 3) {
         return addVar();
     }
 
-    // 11. Read shell
+    // Read shell
     if (strcmp(argv1[0], "read") == 0) {
         return readShell();
     }
 
-    // 12. IfThen
+    // IfThen
     if (!strcmp(argv1[0], "if")) {
         return ifThen();
     }
@@ -264,7 +262,6 @@ int ifThen(){
         return 1;
     }
 
-
 int echoShell() {
     int j = 1;
     while (argv1[j] != NULL) {
@@ -306,7 +303,6 @@ int readShell() {
     return 1;
 }
 
-
 int changeDir() {
     if (i < 2) {
         printf("cd: missing operand\n");
@@ -344,121 +340,66 @@ void handleOutputRedirect() {
 }
 
 
-// int handle_arrows()
-// {
-//     int current_index = (history.last_index - 1) % history.capacity;
-//     printf("history.cmd_history[current_index] = %s\n", history.cmd_history[current_index]);
-//     printf("current_index = %d\n", current_index);
-//     printf("history.last_index = %d\n", history.last_index);
-//     printf("argc1 = %d\n", argc1);
-//     printf("argv1[0][2] = %c\n", argv1[0][2]);
+/* handle the arrows keys */
+int handle_arrows(shell_history* hist, char* command) {
+    printHistory(hist);
 
-//     int ans = 0;
-//     if ((argc1 == 1) && (history.cmd_history[current_index] != NULL) && (argv1[0][2] == 'A' || argv1[0][2] == 'B'))
-//     {
-//         printf("\033[1A"); // line up
-//         printf("\x1b[2K"); // delete line
-//         // printf("%s ", prompt);
-//         printf("%s", history.cmd_history[current_index]);
-//         ans = 1;
-//         int c = 0;
-//         while (c != 'Q' && c != '\n')
-//         {
-//             c = getchar();
-
-//             if (c == '\033')
-//             {
-//                 // printf("\033[1A"); // line up
-//                 printf("\x1b[2K"); // delete line 
-//                 getchar();         // remove [
-//                 switch (getchar())
-//                 {
-//                 case 'A': /* UP arrow */
-//                     if (getchar() == '\n')
-//                     {
-//                         if (current_index == (history.first_index - 1 + history.capacity) % history.capacity)
-//                         {
-//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
-//                             printf("%s", history.cmd_history[current_index % history.capacity]);
-//                         }
-//                         else
-//                         {
-//                             current_index = (current_index - 1 + history.capacity) % history.capacity; 
-//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
-//                             printf("%s", history.cmd_history[current_index % history.capacity]);
-//                         }
-//                     }
-//                     break;
-
-//                 case 'B': /* DOWN arrow*/
-//                     if (getchar() == '\n')
-//                     {
-//                         if (current_index == (history.last_index - 1 + history.capacity) % history.capacity)
-//                         {
-//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
-//                             printf("%s", history.cmd_history[current_index % history.capacity]);
-//                         }
-//                         else
-//                         {
-//                             // printf("\tlast command = %s  index = %d\n", history.cmd_history[current_index % history.capacity], current_index);
-//                             current_index = (current_index + 1) % history.capacity;
-//                             printf("%s", history.cmd_history[current_index % history.capacity]);
-//                         }
-//                     }
-//                     break;
-//                 default:
-//                     break;
-//                 }
-//             }
-//               else if (c == '\n') /* if the user press Enter - repeat the command*/
-//             {
-//                 memset(command, 0, sizeof(command));
-//                 strcpy(command, history.cmd_history[current_index]);
-//                 // printf("after strcpy command = %s\n", command);
-//                 handleShellCommands();
-//                 // printf("after execute command = %s\n", command);
-//                 fflush(stdout);
-//                 current_index = (history.last_index - 1) % 20;
-//                 printf("%s", history.cmd_history[current_index]);
-//             }
-//         }
-//     }
-//     return ans;
+    // initialize history counter and position to the end of history
+    int history_counter = hist->history_size;
+    int history_pos = hist->history_pos;
     
-// }
+    strcpy(tmp_command, command);
 
+    while (1) {
 
-int handle_arrows()
-{
-    static int history_index = -1;
+        if ((strcmp(command, "\033[A")) == 0 ) {// check if up arrow key was pressed
 
-    if (argc1 == 1 && (argv1[0][2] == 'A' || argv1[0][2] == 'B')) {
-        // If arrow up or arrow down key is pressed
-        if (argv1[0][2] == 'A' && history_index < history.cmd_count - 1) {
-            // Move up in history
-            history_index++;
-        } else if (argv1[0][2] == 'B' && history_index > -1) {
-            // Move down in history
-            history_index--;
+            if( history_pos >= 0) { // if not at the beginning of history
+                // set temp command buffer to the previous command from history
+                strcpy(tmp_command, hist->cmd_history[history_pos]);
+                history_pos--;
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                printf("%s %s", prompt, tmp_command);
+                fflush(stdout);
+
+            } else {// if already at beginning of history
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                printf("%s %s", prompt, tmp_command);
+                fflush(stdout);
+
+            }
+           
+        } else if ((strcmp(command, "\033[B")) == 0 ) {// check if down arrow key was pressed
+
+            if (history_pos < history_counter - 1) { // if not at the end of history
+                history_pos++;
+                strcpy(tmp_command, hist->cmd_history[history_pos]); // set temp command buffer to the next command from history
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                printf("%s %s", prompt, tmp_command);
+                fflush(stdout);
+            } else {
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                fflush(stdout);
+                return 1;
+            }
+        } 
+
+        fgets(command, 1024, stdin);
+        command[strlen(command) - 1] = '\0';
+
+        if (strcmp(command, "") == 0) { // if user input is empty
+            strcpy(command, tmp_command);
+            break;
         }
-        
-        // If a valid history entry is selected, replace the current command with the selected command
-        if (history_index >= 0 && history_index < history.cmd_count) {
-            // Delete the current line
-            printf("\033[1A");
-            printf("\x1b[2K");
-            
-            int cmd_idx = (history.last_index - 1 - history_index + history.capacity) % history.capacity;
-            strncpy(command, history.cmd_history[cmd_idx], MAX_LINE_LEN);
-            printf("%s", command);
-        }
-    } else {
-        // Reset history index when a new command is entered
-        history_index = -1;
     }
-    
+
     return 0;
 }
+
 
 
 
@@ -473,8 +414,7 @@ int main(){
 
 
     memset(last_command, 0, MAX_LINE_LEN + 1);
-    initHistory(&history, 20);
-    
+    initHistory(&history);
 
     while (1) {
         resetGlobalVars();
@@ -482,12 +422,15 @@ int main(){
         if (getCommand() < 0) {
             break;
         }
+
+        if (((strcmp(command, "\033[A"))==0) || ((strcmp(command, "\033[B"))==0)) {
+            if (handle_arrows(&history, command)) {
+                continue;
+            }
+        }
         addHistoryEntry(&history, command);
         parseCommand(command);
 
-        
-        handle_arrows();
-        
 
         if (argv1[0] == NULL) {
             continue;
@@ -505,7 +448,7 @@ int main(){
         execute();
   
     }
-    freeHistory(&history);
+    history_destroy(&history);
     sigsetjmp(sigtstp_jmpbuf, 0);
     return 0;
 }

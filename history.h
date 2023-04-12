@@ -1,21 +1,25 @@
 #ifndef TASK_SHELL_HISTORY_H
 #define TASK_SHELL_HISTORY_H
 
-struct History {
-    char **cmd_history;
-    int capacity;
-    int start_idx;
-    int cmd_count;
-    int last_index;
-    int first_index;
-};
+#include <stdio.h>
 
-void initHistory(struct History *h, int capacity);
 
-void addHistoryEntry(struct History *h, char *command);
+#define MAX_SIZE 20
 
-void printHistory(struct History *h);
+typedef struct _History {
+    char** cmd_history;
+    int history_capacity;
+    int history_size;
+    int history_pos;
+    int history_last_index;
+} shell_history;
 
-void freeHistory(struct History *h);
+int initHistory(shell_history* h);
+
+int addHistoryEntry(shell_history* h, char* cmd);
+
+int printHistory(shell_history* h);
+
+int history_destroy(shell_history* h);
 
 #endif //TASK_SHELL_HISTORY_H
