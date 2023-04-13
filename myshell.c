@@ -213,7 +213,7 @@ int ifThen(){
     }
     argv1[j-1] = NULL;
 
-    execute();
+    // execute();
     int currstatus = WEXITSTATUS(status);//(args);
 
     char condition[MAX_LINE_LEN];
@@ -416,7 +416,11 @@ int handle_arrows(shell_history* hist, char* command) {
 
 
 int main(){
-   
+
+
+    memset(last_command, 0, MAX_LINE_LEN + 1);
+    initHistory(&history);
+    
     // Ctrl-C sigaction
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -424,9 +428,6 @@ int main(){
     sigaction(SIGINT, &sa, NULL);
     sigsetjmp(jmpbuf, 1);
 
-
-    memset(last_command, 0, MAX_LINE_LEN + 1);
-    initHistory(&history);
 
     while (1) {
         resetGlobalVars();
