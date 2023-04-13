@@ -4,7 +4,7 @@ FLAGS = -Wall -g
 .PHONY: all
 all: myshell
 
-myshell: myshell.c history.h history.c
+myshell: myshell.c myshell.h history.c history.h
 	$(CC) $(FLAGS) $^ -o $@
 
 .PHONY: clean

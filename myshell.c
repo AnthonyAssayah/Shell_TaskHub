@@ -5,38 +5,13 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <setjmp.h>
-#include "history.h"
+#include "myshell.h"
 
-#define MAX_LINE_LEN 1024
-#define WHITESPACE " \t\n\r"
-
-
-char command[MAX_LINE_LEN + 1];
-char last_command[MAX_LINE_LEN + 1] = ""; 
-char tmp_command[MAX_LINE_LEN + 1];
-char *outfile = NULL, *token;
-int i, fd, amper, redirect, retid, status, piping, input_redirect;
-char *argv1[10], *argv2[10];
-int argc1, redirect_fd, append;
 char prompt[MAX_LINE_LEN + 1] = "hello:";
+char *argv[MAX_LINE_LEN + 1];
 sigjmp_buf jmpbuf;
-int fildes[2];
 shell_history history;
-
-int getCommand();
-void parseCommand(char *command);
-int execute();
-int forkProcess();
-void resetGlobalVars();
-int handleShellCommands();
-int echoShell();
-int addVar();
-int readShell();
-int changeDir();
-void handleOutputRedirect();
-int handle_arrows(shell_history* history, char *command);
-int ifThen();
-
+int status = 0;
 
 // signal handler for Ctrl-C
 void sigint_handler(int sig) {
@@ -44,73 +19,270 @@ void sigint_handler(int sig) {
     siglongjmp(jmpbuf, 1);
 }
 
-/*get the command from the user*/
-int getCommand() {
-    printf("%s ", prompt);
-    if (!fgets(command, MAX_LINE_LEN, stdin)) {
-        return -1;
+/**
+ * Split user command arguments.
+ * @return Number of command arguments.
+ */
+int parseCommand(char *command) {
+    int i = 0;
+    char *token = strtok(command, WHITESPACE);
+    while (token != NULL) {
+        argv[i++] = token;
+        token = strtok(NULL, WHITESPACE);
     }
-    command[strlen(command) - 1] = '\0';
-    // 6. Execute previous command
-    if (strcmp(command, "!!") == 0) {
-        strcpy(command, last_command); // strcpy(src, dest)
-    } else {
-        strcpy(last_command, command); // save command for next iteration
-    }
-    return 1;
+    argv[i] = NULL;
+    return i;
 }
 
-/*parse the command*/
-void parseCommand(char *command) {
-    /* parse command line */
-    i = 0;
-    piping = 0;
-    token = strtok(command, WHITESPACE);
-    while (token != NULL) {
-        argv1[i++] = token;
-        token = strtok(NULL, WHITESPACE);
-        if (token && !strcmp(token, "|")) {
-            piping = 1;
+/* handle the arrows keys */
+int handleArrows(shell_history *hist, char *command) {
+    printHistory(hist); // FOR DEBUGGING //
+    char tmp_command[MAX_LINE_LEN + 1];
+
+    // initialize history counter and position to the end of history
+    int history_counter = hist->history_size;
+    int history_pos = hist->history_pos;
+
+    strcpy(tmp_command, command);
+
+    while (1) {
+        if ((strcmp(command, "\033[A")) == 0) { // check if up arrow key was pressed
+            if (history_pos >= 0) { // if not at the beginning of history
+                // set temp command buffer to the previous command from history
+                strcpy(tmp_command, hist->cmd_history[history_pos]);
+                --history_pos;
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                printf("%s %s", prompt, tmp_command);
+                fflush(stdout);
+            } else { // if already at beginning of history
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                printf("%s %s", prompt, tmp_command);
+                fflush(stdout);
+            }
+        } else if ((strcmp(command, "\033[B")) == 0) {// check if down arrow key was pressed
+            if (history_pos < history_counter - 1) { // if not at the end of history
+                ++history_pos;
+                strcpy(tmp_command,
+                       hist->cmd_history[history_pos]); // set temp command buffer to the next command from history
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                printf("%s %s", prompt, tmp_command);
+                fflush(stdout);
+            } else {
+                printf("\033[1A"); // line up
+                printf("\x1b[2K"); // delete line
+                fflush(stdout);
+                return 1;
+            }
+        }
+        fgets(command, MAX_LINE_LEN, stdin);
+        command[strlen(command) - 1] = '\0';
+        if (strcmp(command, "") == 0) { // if user input is empty
+            strcpy(command, tmp_command);
             break;
         }
     }
-    argv1[i] = NULL;
-    argc1 = i;
-
-    /* Is command empty */
-    if (argv1[0] == NULL) { return; }
-
-    /* Does command contain pipe */
-    if (piping) {
-        i = 0;
-        while (token != NULL) {
-            token = strtok(NULL, WHITESPACE);
-            argv2[i++] = token;
-        }
-        argv2[i] = NULL;
-    }
+    return 0;
 }
 
-/*execute the command*/
-int execute() {
-    handleOutputRedirect();
- 
-    if (handleShellCommands() ) {
-        return 1;
+int ifThen() {
+    char *commands[MAX_COMMANDS];
+    char condition[MAX_LINE_LEN + 1];
+    int commandCount = 0, j = 1;
+
+    while (argv[j] != NULL) {
+        argv[j - 1] = argv[j];
+        ++j;
     }
-    if (forkProcess()) {
-        return 1;
+    argv[j - 1] = NULL;
+
+    // execute();
+    int currstatus = WEXITSTATUS(status);//(args);
+
+    if (!currstatus) {
+        if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
+            condition[strlen(condition) - 1] = '\0';
+            if (!strcmp(condition, "then")) {
+                if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
+                    condition[strlen(condition) - 1] = '\0';
+                    int elseFlag = 1;
+                    while (strcmp(condition, "fi")) {
+                        if (!strcmp(condition, "else")) {
+                            elseFlag = 0;
+                        }
+                        if (elseFlag) {
+                            commands[commandCount++] = strdup(condition);
+                        }
+                        if (fgets(condition, MAX_LINE_LEN, stdin) == NULL) {
+                            break;
+                        }
+                        condition[strlen(condition) - 1] = '\0';
+                    }
+                }
+            } else {
+                printf("Bad if statement\n");
+                return 0;
+            }
+        }
+    } else {
+        if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
+            condition[strlen(condition) - 1] = '\0';
+            while (strcmp(condition, "else")) {
+                if (fgets(condition, MAX_LINE_LEN, stdin) == NULL) {
+                    break;
+                }
+                condition[strlen(condition) - 1] = '\0';
+            }
+            while (strcmp(condition, "fi")) {
+                commands[commandCount++] = strdup(condition);
+                if (fgets(condition, MAX_LINE_LEN, stdin) == NULL) {
+                    break;
+                }
+                condition[strlen(condition) - 1] = '\0';
+            }
+        }
+    }
+    int argc = 0;
+    for (int i = 0; i < commandCount; ++i) {
+        argc = parseCommand(commands[i]);
+        execute(argc);
+        free(commands[i]);
     }
     return 1;
 }
 
+int addVar(int argc) {
+    char new_var[MAX_LINE_LEN + 1] = "";
+    for (int j = 2; j < argc; j++) {
+        strcat(new_var, argv[j]);
+        strcat(new_var, " ");
+    }
+    setenv(argv[0] + 1, new_var, 1);
+    return 0;
+}
 
-int forkProcess() {
-   
+int readShell() {
+    char input[MAX_LINE_LEN + 1];
+    fgets(input, MAX_LINE_LEN, stdin);
+    input[strlen(input) - 1] = '\0';
+    setenv(argv[1], input, 1);
+    return 0;
+}
+
+int changeDir(int argc) {
+    if (argc < 2) {
+        printf("cd: missing operand\n");
+    } else if (chdir(argv[1]) < 0) {
+        printf("cd: %s: No such file or directory\n", argv[1]);
+    } else {
+        // print current directory
+        char cwd[MAX_LINE_LEN];
+        printf("%s \n", getcwd(cwd, sizeof(cwd)));
+    }
+    return 0;
+}
+
+int echoShell() {
+    int j = 1;
+    while (argv[j] != NULL) {
+        if (argv[j][0] == '$') { // check if argument is a variable
+            if (strcmp(argv[j], "$?") == 0) {
+                printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
+            } else {
+                char *var_value = getenv(argv[j] + 1); // get the value of the variable
+                if (var_value != NULL) {
+                    printf("%s ", var_value); // print the value of the variable
+                }
+            }
+        } else {
+            printf("%s ", argv[j]);
+        }
+        ++j;
+    }
+    printf("\n");
+    return 0;
+}
+
+int handleOutputRedirect(int argc, char **outfile, int *append, int *input_redirect) {
+    int flag = 0, redirect_fd = -1;
+    if (argc > 1) {
+        if (!strcmp(argv[argc - 2], ">")) {
+            flag = 1;
+            redirect_fd = STDOUT_FILENO;
+        } else if (!strcmp(argv[argc - 2], ">>")) {
+            flag = 1;
+            *append = 1; // mark file to open with append flag
+            redirect_fd = STDOUT_FILENO;
+        } else if (!strcmp(argv[argc - 2], "2>")) { // redirect stderr
+            flag = 1;
+            redirect_fd = STDERR_FILENO;
+        } else if (!strcmp(argv[argc - 2], "<")) {
+            flag = 1;
+            *input_redirect = 1;
+            redirect_fd = STDIN_FILENO;
+        }
+    }
+    if (flag) {
+        *outfile = argv[argc - 1];
+        argv[argc - 2] = NULL;
+    }
+    return redirect_fd;
+}
+
+int execute(int argc) {
+    int amper = 0, rv = -1, append = 0, input_redirect = 0, fd, redirect_fd;
+    char *outfile;
+
+    /* Handle regular shell commands */
+
+    if (argv[0] == NULL) {
+        return 0;
+    }
+
+    if (!strcmp(argv[0], "if")) {
+        return ifThen();
+    }
+
+    // Add new variables
+    if (argv[0][0] == '$' && strcmp(argv[1], "=") == 0 && argc >= 3) {
+        return addVar(argc);
+    }
+
+    // Read shell
+    if (strcmp(argv[0], "read") == 0) {
+        return readShell();
+    }
+
+    // Change dir
+    if (strcmp(argv[0], "cd") == 0) {
+        return changeDir(argc);
+    }
+
+    // Change prompt
+    if (argc == 3 && strcmp(argv[0], "prompt") == 0 && strcmp(argv[1], "=") == 0) {
+        strcpy(prompt, argv[2]);
+        return 1;
+    }
+
+    // Echo command
+    if (strcmp(argv[0], "echo") == 0) {
+        return echoShell();
+    }
+
+    if (!strcmp(argv[argc - 1], "&")) {
+        amper = 1;
+        argv[argc - 1] = NULL;
+    }
+
+    redirect_fd = handleOutputRedirect(argc, &outfile, &append, &input_redirect);
+
     /* for commands not part of the shell command language */
+
     if (fork() == 0) {
         /* redirection of IO */
-        if (redirect) {
+        if (redirect_fd > -1) {
             if (append) {
                 fd = open(outfile, O_WRONLY | O_CREAT | O_APPEND, 0660);
             } else if (input_redirect) {
@@ -122,305 +294,24 @@ int forkProcess() {
             dup(fd);
             close(fd);
         }
-        if (piping) {   
-                           // ls - l | wc - l | wc - l | > output.txt 
-            pipe(fildes);
-            if (fork() == 0) {
-                /* first component of command line */
-                close(STDOUT_FILENO);
-                dup(fildes[1]);
-                close(fildes[1]);
-                    close(fildes[0]);
-                    /* stdout now goes to pipe */
-                    /* child processIfThen does command */
-                    execvp(argv1[0], argv1);
-                    exit(0);
-            }
-            /* 2nd command component of command line */
-            close(STDIN_FILENO);
-            dup(fildes[0]);
-            close(fildes[0]);
-            close(fildes[1]);
-            /* standard input now comes from pipe */
-            execvp(argv2[0], argv2);
-            exit(0);
-        
-        } else {
-            // printf("enter in else exec\n");
-            execvp(argv1[0], argv1);
-            exit(0);
-        }
+        execvp(argv[0], argv);
     }
     /* parent continues here */
     if (amper == 0) {
-        retid = wait(&status);
+        wait(&status);
+        rv = status;
     }
-    return 1;
+
+    return rv;
 }
 
-void resetGlobalVars() {
-    memset(command, 0, MAX_LINE_LEN + 1);
-    amper = redirect = append = 0;
-    redirect_fd = STDOUT_FILENO;
-}
+int main() {
+    char command[MAX_LINE_LEN + 1];
+    char last_command[MAX_LINE_LEN + 1];
+    int argc = 0;
 
-/*handle the shell commands*/
-int handleShellCommands() {
-    // Change prompt
-    if (argc1 == 3 && strcmp(argv1[0], "prompt") == 0 && strcmp(argv1[1], "=") == 0) {
-        strcpy(prompt, argv1[2]);
-        return 1;
-    }
-
-    // Echo command
-    if (strcmp(argv1[0], "echo") == 0) {
-        return echoShell();
-    }
-
-    // Change dir
-    if (strcmp(argv1[0], "cd") == 0) {
-        return changeDir();
-    }
-
-    // Add new variables
-    if (argv1[0][0] == '$' && strcmp(argv1[1], "=") == 0 && argc1 >= 3) {
-        return addVar();
-    }
-
-    // Read shell
-    if (strcmp(argv1[0], "read") == 0) {
-        return readShell();
-    }
-
-    // IfThen
-    if (!strcmp(argv1[0], "if")) {
-        return ifThen();
-    }
-
-    return 0;
-}
-
-#define MAX_COMMANDS 100
-
-int ifThen(){
-    char *commands[MAX_COMMANDS];
-    int commandCount = 0;
-
-    int j = 1;
-    while (argv1[j] != NULL) {
-        argv1[j-1] = argv1[j];
-        j++;
-    }
-    argv1[j-1] = NULL;
-
-    // execute();
-    int currstatus = WEXITSTATUS(status);//(args);
-
-    char condition[MAX_LINE_LEN];
-    if(!currstatus){
-        if (fgets(condition, 1024, stdin) != NULL) {
-            condition[strlen(condition) - 1] = '\0';
-            if (!strcmp(condition,"then")){
-                if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
-                    condition[strlen(condition) - 1] = '\0';
-                    int elseFlag = 1;
-                    while(strcmp(condition, "fi")){
-                        if(!strcmp(condition, "else")){
-                            elseFlag = 0;
-                        }
-                        if(elseFlag){
-                            commands[commandCount++] = strdup(condition);
-                        }
-                        if (fgets(condition, 1024, stdin) == NULL) {
-                            break;
-                        }
-                        condition[strlen(condition) - 1] = '\0';
-                    }
-                }
-            }
-            else{
-                printf("Bad if statement\n");
-                return 0;
-            }
-        }
-    }
-    else{
-        if (fgets(condition, 1024, stdin) != NULL) {
-            condition[strlen(condition) - 1] = '\0';
-            while(strcmp(condition, "else")){
-                    if (fgets(condition, 1024, stdin) == NULL) {
-                        break;
-                    }
-                    condition[strlen(condition) - 1] = '\0';
-                }
-            while(strcmp(condition, "fi")){
-                    commands[commandCount++] = strdup(condition);
-                    if (fgets(condition, 1024, stdin) == NULL) {
-                        break;
-                    }
-                    condition[strlen(condition) - 1] = '\0';
-                }
-        }
-    }
-
-    for (int i = 0; i < commandCount; i++) {
-        parseCommand(commands[i]);
-        execute();
-        free(commands[i]);
-    }
-
-    return 1;
-}
-
-
-
-int echoShell() {
-    int j = 1;
-    while (argv1[j] != NULL) {
-        if (argv1[j][0] == '$') { // check if argument is a variable
-            if (strcmp(argv1[j], "$?") == 0) {
-                printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
-            } else {
-                char *var_value = getenv(argv1[j] + 1); // get the value of the variable
-                if (var_value != NULL) {
-                    printf("%s ", var_value); // print the value of the variable
-                }
-            }
-        } else {
-            printf("%s ", argv1[j]);
-    
-        }
-        j++;
-
-    }
-    printf("\n");
-    return 1;
-}
-
-int addVar() {
-    char new_var[MAX_LINE_LEN] = "";
-    for (int j = 2; j < argc1; j++) {
-        strcat(new_var, argv1[j]);
-        strcat(new_var, " ");
-    }
-    setenv(argv1[0] + 1, new_var, 1);
-    return 1;
-}
-
-int readShell() {
-    char input[1024];
-    fgets(input, 1024, stdin);
-    input[strlen(input) - 1] = '\0';
-    setenv(argv1[1], input, 1);
-    return 1;
-}
-
-int changeDir() {
-    if (i < 2) {
-        printf("cd: missing operand\n");
-    } else if (chdir(argv1[1]) < 0) {
-        printf("cd: %s: No such file or directory\n", argv1[1]);
-    } else {
-        // print current directory
-        char cwd[MAX_LINE_LEN];
-        printf("%s \n", getcwd(cwd, sizeof(cwd)));
-    }
-    return 1;
-}
-
-void handleOutputRedirect() {
-
-    int flag = 0;
-    if (argc1 > 1) {
-        if (!strcmp(argv1[argc1 - 2], ">")) {
-            redirect = flag = 1;
-        } else if (!strcmp(argv1[argc1 - 2], ">>")) {
-            redirect = append = flag = 1;
-        } else if (!strcmp(argv1[argc1 - 2], "2>")) { // redirect stderr
-            redirect = flag = 1;
-            redirect_fd = STDERR_FILENO;
-        } else if (!strcmp(argv1[argc1 - 2], "<")) {
-            redirect = flag = input_redirect = 1;
-            redirect_fd = STDIN_FILENO;
-        }
-    }
-    if (flag) {
-        argv1[argc1 - 2] = NULL;
-        outfile = argv1[argc1 - 1];
-    }
-    
-}
-
-
-/* handle the arrows keys */
-int handle_arrows(shell_history* hist, char* command) {
-    printHistory(hist);
-
-    // initialize history counter and position to the end of history
-    int history_counter = hist->history_size;
-    int history_pos = hist->history_pos;
-    
-    strcpy(tmp_command, command);
-
-    while (1) {
-
-        if ((strcmp(command, "\033[A")) == 0 ) {// check if up arrow key was pressed
-
-            if( history_pos >= 0) { // if not at the beginning of history
-                // set temp command buffer to the previous command from history
-                strcpy(tmp_command, hist->cmd_history[history_pos]);
-                history_pos--;
-                printf("\033[1A"); // line up
-                printf("\x1b[2K"); // delete line
-                printf("%s %s", prompt, tmp_command);
-                fflush(stdout);
-
-            } else {// if already at beginning of history
-                printf("\033[1A"); // line up
-                printf("\x1b[2K"); // delete line
-                printf("%s %s", prompt, tmp_command);
-                fflush(stdout);
-
-            }
-           
-        } else if ((strcmp(command, "\033[B")) == 0 ) {// check if down arrow key was pressed
-
-            if (history_pos < history_counter - 1) { // if not at the end of history
-                history_pos++;
-                strcpy(tmp_command, hist->cmd_history[history_pos]); // set temp command buffer to the next command from history
-                printf("\033[1A"); // line up
-                printf("\x1b[2K"); // delete line
-                printf("%s %s", prompt, tmp_command);
-                fflush(stdout);
-            } else {
-                printf("\033[1A"); // line up
-                printf("\x1b[2K"); // delete line
-                fflush(stdout);
-                return 1;
-            }
-        } 
-
-        fgets(command, 1024, stdin);
-        command[strlen(command) - 1] = '\0';
-
-        if (strcmp(command, "") == 0) { // if user input is empty
-            strcpy(command, tmp_command);
-            break;
-        }
-    }
-
-    return 0;
-}
-
-
-
-
-int main(){
-
-
-    memset(last_command, 0, MAX_LINE_LEN + 1);
     initHistory(&history);
-    
+
     // Ctrl-C sigaction
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -430,35 +321,40 @@ int main(){
 
 
     while (1) {
-        resetGlobalVars();
+        // Reset global variables
+        memset(command, 0, MAX_LINE_LEN + 1);
 
-        if (getCommand() < 0) {
+        // Get command from user
+        printf("%s ", prompt);
+        if (!fgets(command, MAX_LINE_LEN, stdin)) {
             break;
         }
+        command[strlen(command) - 1] = '\0';
 
-        if (((strcmp(command, "\033[A"))==0) || ((strcmp(command, "\033[B"))==0)) {
-            if (handle_arrows(&history, command)) {
+        if (((strcmp(command, "\033[A")) == 0) || ((strcmp(command, "\033[B")) == 0)) {
+            if (handleArrows(&history, command)) {
                 continue;
             }
         }
-        addHistoryEntry(&history, command);
-        parseCommand(command);
 
-
-        if (argv1[0] == NULL) {
-            continue;
-        } else if (strcmp(argv1[0], "quit") == 0) {
+        if (strcmp(command, "quit") == 0) {
             break;
         }
 
-        if (!strcmp(argv1[argc1 - 1], "&")) {
-            amper = 1;
-            argv1[argc1 - 1] = NULL;
+        if (strcmp(command, "!!") == 0) {
+            strcpy(command, last_command); // copies last_command into command
+        } else {
+            strcpy(last_command, command); // save command for next iteration
         }
-        execute();
-  
+        // Save command in history
+        addHistoryEntry(&history, command);
+
+        // Split command arguments (into argv variable)
+        argc = parseCommand(command);
+
+        // Handle command execution
+        status = execute(argc);
     }
     history_destroy(&history);
     return 0;
 }
-
