@@ -245,28 +245,23 @@ int execute(int argc) {
         return ifThen();
     }
 
-    // Add new variables
-    if (argv[0][0] == '$' && strcmp(argv[1], "=") == 0 && argc >= 3) {
+    if (argv[0][0] == '$' && strcmp(argv[1], "=") == 0 && argc >= 3) { // Add new variables
         return addVar(argc);
     }
 
-    // Read shell
     if (strcmp(argv[0], "read") == 0) {
         return readShell();
     }
 
-    // Change dir
     if (strcmp(argv[0], "cd") == 0) {
         return changeDir(argc);
     }
 
-    // Change prompt
-    if (argc == 3 && strcmp(argv[0], "prompt") == 0 && strcmp(argv[1], "=") == 0) {
+    if (argc == 3 && strcmp(argv[0], "prompt") == 0 && strcmp(argv[1], "=") == 0) { // Change prompt message
         strcpy(prompt, argv[2]);
         return 1;
     }
 
-    // Echo command
     if (strcmp(argv[0], "echo") == 0) {
         return echoShell();
     }
@@ -346,6 +341,7 @@ int main() {
         } else {
             strcpy(last_command, command); // save command for next iteration
         }
+
         // Save command in history
         addHistoryEntry(&history, command);
 
