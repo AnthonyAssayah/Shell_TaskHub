@@ -6,7 +6,7 @@
 
 #define MAX_SIZE 20
 
-typedef struct _History {
+typedef struct History {
     char** cmd_history;
     int history_capacity;
     int history_size;
