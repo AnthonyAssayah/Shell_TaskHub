@@ -19,7 +19,7 @@ int i, fd, amper, redirect, retid, status, piping, input_redirect;
 char *argv1[10], *argv2[10];
 int argc1, redirect_fd, append;
 char prompt[MAX_LINE_LEN + 1] = "hello:";
-sigjmp_buf jmpbuf, sigtstp_jmpbuf;
+sigjmp_buf jmpbuf;
 int fildes[2];
 shell_history history;
 
@@ -450,18 +450,14 @@ int main(){
             break;
         }
 
-
         if (!strcmp(argv1[argc1 - 1], "&")) {
             amper = 1;
             argv1[argc1 - 1] = NULL;
         }
-
-
         execute();
   
     }
     history_destroy(&history);
-    sigsetjmp(sigtstp_jmpbuf, 0);
     return 0;
 }
 
