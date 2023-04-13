@@ -31,6 +31,8 @@ Redirection: `2>` , `>` , `>>` , and `<` as in bash.
 
 In the implemented shell program, if the user types `Control-C` during command execution, the program will not terminate but instead print the message "You typed Control-C!" to the console.
 
+## Logic Command
+
 The shell program supports conditional statements such as if/else, allowing users to execute different commands based on the result of a condition. The syntax is as follows:
 
 ``` 
@@ -42,9 +44,21 @@ else
 fi
 ```
 
-The if statement executes a command and checks if the exit status is successful (0). If it is, the then block is executed. Otherwise, the else block is executed. The statement ends with fi.
+The _if_ statement executes a command and checks if the exit status is successful (0). If it is, the _then_ block is executed. Otherwise, the _else_ block is executed. The statement ends with _fi_. For example,
 
+```
+if ls | grep my_file.txt
+then
+  echo "file exists"
+else
+  echo "file does not exist"
+fi
+```
+This command will print "file exists" if the file exists in the current directory, otherwise it will display "file does not exist".
 
+## History Command
+
+The history feature in this shell allows you to navigate through the last 20 commands executed using the ` arrow up ` or ` arrow down ` keys and then ` Enter `. The last executed command is displayed on the terminal and can be executed again by pressing ` Enter `.
   
 ## Usage
 
@@ -59,7 +73,7 @@ make all
 ```
 ./myshell
 ```
- You should now see the shell prompt (hello: by default).
+You should now see the shell prompt (hello: by default).
 
 5. After exiting the shell, run the following command to clean the created files.
 ```
