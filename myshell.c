@@ -164,7 +164,7 @@ int ifThen() {
     }
     return 1;
 }
-
+ 
 int addVar(int argc) {
     char new_var[MAX_LINE_LEN + 1] = "";
     for (int j = 2; j < argc; j++) {

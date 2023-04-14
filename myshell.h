@@ -8,7 +8,7 @@
 #define MAX_COMMANDS 100
 #define READ_END 0
 #define WRITE_END 1
-
+ 
 void sigint_handler(int sig);
 
 int parseCommand(char *command);
