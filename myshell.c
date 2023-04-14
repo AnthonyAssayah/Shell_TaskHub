@@ -9,6 +9,7 @@
 
 char prompt[MAX_LINE_LEN + 1] = "hello:";
 char *argv[MAX_LINE_LEN + 1];
+char *pipe_buffer[MAX_LINE_LEN + 1];
 sigjmp_buf jmpbuf;
 shell_history history;
 int status = 0;
@@ -31,6 +32,17 @@ int parseCommand(char *command) {
         token = strtok(NULL, WHITESPACE);
     }
     argv[i] = NULL;
+    return i;
+}
+
+int parsePipes(char *command) {
+    int i = 0;
+    char *token = strtok(command, "|");
+    while (token != NULL) {
+        pipe_buffer[i++] = token;
+        token = strtok(NULL, "|");
+    }
+    pipe_buffer[i] = NULL;
     return i;
 }
 
@@ -65,7 +77,7 @@ int handleArrows(shell_history *hist, char *command) {
             if (history_pos < history_counter - 1) { // if not at the end of history
                 ++history_pos;
                 strcpy(tmp_command,
-                       hist->cmd_history[history_pos]); // set temp command buffer to the next command from history
+                hist->cmd_history[history_pos]); // set temp command buffer to the next command from history
                 printf("\033[1A"); // line up
                 printf("\x1b[2K"); // delete line
                 printf("%s %s", prompt, tmp_command);
@@ -300,6 +312,42 @@ int execute(int argc) {
     return rv;
 }
 
+void handlePipeExecution(char *command) {
+    int num_cmds = parsePipes(command);
+    int fds[num_cmds][2];
+    int argc = 0;
+    for (int i = 0; i < num_cmds; ++i) {
+        argc = parseCommand(pipe_buffer[i]);
+        if (i != num_cmds - 1) { // if not last command
+            if(pipe(fds[i]) < 0) {
+                perror("Error in pipe!");
+                exit(2);
+            }
+        }
+        if (fork() == 0) {
+            // Child process
+            if (i != num_cmds - 1) { // if not last command
+                dup2(fds[i][WRITE_END], STDOUT_FILENO);
+                close(fds[i][READ_END]);
+                close(fds[i][WRITE_END]);
+            }
+            if (i != 0) {
+                dup2(fds[i - 1][READ_END], STDIN_FILENO);
+                close(fds[i - 1][READ_END]);
+                close(fds[i - 1][WRITE_END]);
+            }
+            status = execute(argc);
+            exit(0);
+        }
+        // Parent process
+        if (i != 0) {
+            close(fds[i - 1][READ_END]);
+            close(fds[i - 1][WRITE_END]);
+        }
+        wait(NULL);
+    }
+}
+
 int main() {
     char command[MAX_LINE_LEN + 1];
     char last_command[MAX_LINE_LEN + 1];
@@ -345,11 +393,15 @@ int main() {
         // Save command in history
         addHistoryEntry(&history, command);
 
-        // Split command arguments (into argv variable)
-        argc = parseCommand(command);
-
-        // Handle command execution
-        status = execute(argc);
+        // strchr() returns a pointer to the first occurrence of the specified char or NULL if not found.
+        if (strchr(command, '|') != NULL) {
+            handlePipeExecution(command);
+        } else {
+            // Split command arguments (into argv variable)
+            argc = parseCommand(command);
+            // Handle command execution
+            status = execute(argc);
+        }
     }
     history_destroy(&history);
     return 0;
