@@ -11,25 +11,27 @@ This project is a simple Unix shell program written in C that allows users to ex
 My shell program supports all the standard commands available in bash. Additionally, it has implemented custom commands required by the assignment. These include:
 
 
-` cd ` -  Changes the current working directory.
+- ` cd ` -  Changes the current working directory.
 
-` echo ` - Prints the text after the echo command, including variables as `echo $variable_name`.
+- ` echo ` - Prints the text after the echo command, including variables as `echo $variable_name`.
 
-`!!` - Executes the last command entered.
+- `!!` - Executes the last command entered.
 
-`quit` - Exits the shell.
+- `quit` - Exits the shell.
 
-`echo $?` - Prints the exit status of the last executed command.
+- `echo $?` - Prints the exit status of the last executed command.
 
-`read` - Waits for user input and assigns it to a variable.
+- `read` - Waits for user input and assigns it to a variable.
 
-`$variable_name = value` - Variables can be declared using the syntax. 
+- `$variable_name = value` - Variables can be declared using the syntax. 
 
-`prompt = <new prompt>` - The prompt can also be changed using the syntax.
+- `prompt = <new prompt>` - The prompt can also be changed using the syntax.
 
-Redirection: `2>` , `>` , `>>` , and `<` as in bash.
+- Redirection: `2>` , `>` , `>>` , and `<` as in bash. (make sure to not forgot `SPACE` between the last character and the sign in each side)
 
-In the implemented shell program, if the user types `Control-C` during command execution, the program will not terminate but instead print the message "You typed Control-C!" to the console.
+- Multiple pipes commands, separate by `|` work correctly. (make sure to not forgot `SPACE` between the last character and the sign in each side)
+
+- In the implemented shell program, if the user types `Control-C` during command execution, the program will not terminate but instead print the message "You typed Control-C!" to the console.
 
 ## Logic Command
 
@@ -58,8 +60,35 @@ This command will print "file exists" if the file exists in the current director
 
 ## History Command
 
-The history feature in this shell allows you to navigate through the last 20 commands executed using the ` arrow up ` or ` arrow down ` keys and then ` Enter `. The last executed command is displayed on the terminal and can be executed again by pressing ` Enter `.
-  
+The history feature in this shell allows you to navigate through the last 20 commands executed using the ` arrow up ` or ` arrow down ` keys and then ` Enter `. The last executed command is displayed on the terminal and can be executed again by pressing ` Enter `. (In the begging of the function, we let the Printhistory() function for debugging, you can erase it you want!)
+
+## Examples
+
+- _Read_ command need to be in this format:
+```
+hello: read $variable_name
+$value
+hello: echo $varibale_name
+$value
+
+hello: read name
+David
+hello: echo $name
+David
+```
+- Adding new variables:
+```
+hello: $city = London
+hello: echo $city
+London
+```
+
+## Video with examples
+
+https://user-images.githubusercontent.com/92322613/232251585-857d3cff-c798-42cf-9e9f-7c05bf0c1a07.mp4
+
+
+
 ## Usage
 
 
