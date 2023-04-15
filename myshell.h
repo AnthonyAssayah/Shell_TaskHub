@@ -25,11 +25,11 @@ int echoShell();
 
 int handleOutputRedirect(int argc, char **outfile, int *append, int *input_redirect);
 
-void handlePipeExecution(char *command);
+int handlePipeExecution(char *command);
 
 int execute(int argc);
 
-void fullExecution(char *command);
+int fullExecution(char *command);
 
 int handleArrows(shell_history *hist, char *command);
 

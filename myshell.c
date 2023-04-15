@@ -104,10 +104,8 @@ int ifThen() {
     char condition[MAX_LINE_LEN + 1];
     int commandCount = 0;
 
-    int currstatus = WEXITSTATUS(status);
-
-    int elseFlag = !currstatus ? 1 : 0;
-    /* if !currstatus is True: need to execute 'then' statement. flag will be true until else is reached.
+    int elseFlag = status == 0 ? 1 : 0;
+    /* if status is zero: need to execute 'then' statement. flag will be true until else is reached.
      * otherwise: need to execute 'else' statement. flag will be false until else is reached.
      */
     int counter = 0; // count number of user args
@@ -186,7 +184,7 @@ int echoShell() {
     while (argv[j] != NULL) {
         if (argv[j][0] == '$') { // check if argument is a variable
             if (strcmp(argv[j], "$?") == 0) {
-                printf("%d ", WEXITSTATUS(status)); // prints the status of the last command executed
+                printf("%d ", status); // prints the status of the last command executed
             } else {
                 char *var_value = getenv(argv[j] + 1); // get the value of the variable
                 if (var_value != NULL) {
@@ -287,16 +285,15 @@ int execute(int argc) {
     /* parent continues here */
     if (amper == 0) {
         wait(&status);
-        rv = status;
+        rv = WEXITSTATUS(status);
     }
-
     return rv;
 }
 
-void handlePipeExecution(char *command) {
+int handlePipeExecution(char *command) {
     int num_cmds = parsePipes(command);
     int fds[num_cmds][2];
-    int argc = 0;
+    int argc = 0, rv = -1;
     for (int i = 0; i < num_cmds; ++i) {
         argc = parseCommand(pipe_buffer[i]);
         if (i != num_cmds - 1) { // if not last command
@@ -317,31 +314,34 @@ void handlePipeExecution(char *command) {
                 close(fds[i - 1][READ_END]);
                 close(fds[i - 1][WRITE_END]);
             }
-            status = execute(argc);
-            exit(0);
+            rv = execute(argc);
+            if (rv != 0) { exit(EXIT_FAILURE); }
+            exit(EXIT_SUCCESS);
         }
         // Parent process
         if (i != 0) {
             close(fds[i - 1][READ_END]);
             close(fds[i - 1][WRITE_END]);
         }
-        wait(NULL);
+        wait(&status);
+        rv = WEXITSTATUS(status);
     }
+    return rv;
 }
+
 /**
  * Route command according to needed execution (piping or regular).
  * @param command
  */
-void fullExecution(char *command) {
+int fullExecution(char *command) {
     // strchr() returns a pointer to the first occurrence of the specified char or NULL if not found.
     if (strchr(command, '|') != NULL) {
-        handlePipeExecution(command);
-    } else {
-        // Split command arguments (into argv variable)
-        int argc = parseCommand(command);
-        // Handle command execution
-        status = execute(argc);
+        return handlePipeExecution(command);
     }
+    // Split command arguments (into argv variable)
+    int argc = parseCommand(command);
+    // Handle command execution
+    return execute(argc);
 }
 
 int main() {
@@ -357,7 +357,6 @@ int main() {
     sa.sa_handler = sigint_handler;
     sigaction(SIGINT, &sa, NULL);
     sigsetjmp(jmpbuf, 1);
-
 
     while (1) {
         // Reset global variables
@@ -395,7 +394,6 @@ int main() {
         }
 
         fullExecution(command);
-
         if (is_if_command) {
             ifThen();
             is_if_command = 0;
