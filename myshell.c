@@ -325,6 +325,7 @@ int handlePipeExecution(char *command) {
         }
         wait(&status);
         rv = WEXITSTATUS(status);
+        if (rv != 0) { return rv; } // stop execution if there is an error
     }
     return rv;
 }
