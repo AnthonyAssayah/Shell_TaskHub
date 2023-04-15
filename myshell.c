@@ -70,7 +70,7 @@ int parsePipes(char *command) {
 
 /* handle the arrows keys */
 int handleArrows(shell_history *hist, char *command) {
-    printHistory(hist); // FOR DEBUGGING //
+    // printHistory(hist); // FOR DEBUGGING //
     char tmp_command[MAX_LINE_LEN + 1];
 
     // initialize history counter and position to the end of history
