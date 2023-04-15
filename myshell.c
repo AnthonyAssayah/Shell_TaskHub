@@ -124,7 +124,7 @@ int ifThen() {
                     }
                     break;
                 }
-                if (isspace(condition[0]) > 0) { //  isspace() returns true if the character is a space
+                if (condition[0] != '\0') {
                     ++counter; // got argument from user!
                 }
                 if (!strcmp(condition, "else")) {
