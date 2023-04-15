@@ -104,58 +104,45 @@ int ifThen(int argc) {
     char condition[MAX_LINE_LEN + 1];
     int commandCount = 0, j = 1;
 
+    // remove if from argv and shift the rest of the arguments
     while (argv[j] != NULL) {
         argv[j - 1] = argv[j];
         ++j;
     }
     argv[j - 1] = NULL;
+    --argc;
 
-//    status = execute(argc);
+    status = execute(argc);
     int currstatus = WEXITSTATUS(status);//(args);
+    printf("CURRENT STATUS IS: %d\n", currstatus);
 
-    if (!currstatus) {
-        if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
-            condition[strlen(condition) - 1] = '\0';
-            if (!strcmp(condition, "then")) {
-                if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
-                    condition[strlen(condition) - 1] = '\0';
-                    int elseFlag = 1;
-                    while (strcmp(condition, "fi")) {
-                        if (!strcmp(condition, "else")) {
-                            elseFlag = 0;
-                        }
-                        if (elseFlag) {
-                            commands[commandCount++] = strdup(condition);
-                        }
-                        if (fgets(condition, MAX_LINE_LEN, stdin) == NULL) {
-                            break;
-                        }
-                        condition[strlen(condition) - 1] = '\0';
-                    }
-                }
-            } else {
-                printf("Bad if statement\n");
-                return 0;
-            }
-        }
-    } else {
-        if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
-            condition[strlen(condition) - 1] = '\0';
-            while (strcmp(condition, "else")) {
-                if (fgets(condition, MAX_LINE_LEN, stdin) == NULL) {
+    int elseFlag = !currstatus ? 1 : 0;
+    /* if !currstatus is True: need to execute 'then' statement. flag will be true until else is reached.
+     * otherwise: need to execute 'else' statement. flag will be false until else is reached.
+     */
+    if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
+        condition[strlen(condition) - 1] = '\0';
+        if (!strcmp(condition, "then")) {
+            while (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
+                condition[strlen(condition) - 1] = '\0';
+                if(!strcmp(condition, "fi")) {
                     break;
                 }
-                condition[strlen(condition) - 1] = '\0';
-            }
-            while (strcmp(condition, "fi")) {
-                commands[commandCount++] = strdup(condition);
-                if (fgets(condition, MAX_LINE_LEN, stdin) == NULL) {
-                    break;
+                if (!strcmp(condition, "else")) {
+                    printf("CHANGE FLAG: %d\n", elseFlag);
+                    elseFlag = !elseFlag;
+                    printf("FLAG IS NOW: %d\n", elseFlag);
+                } else if (elseFlag) {
+                    printf("ADD COMMAND\n");
+                    commands[commandCount++] = strdup(condition);
                 }
-                condition[strlen(condition) - 1] = '\0';
             }
+        } else {
+            printf("Bad if statement\n");
+            return 0;
         }
     }
+
     argc = 0;
     for (int i = 0; i < commandCount; ++i) {
         argc = parseCommand(commands[i]);
@@ -319,7 +306,7 @@ void handlePipeExecution(char *command) {
     for (int i = 0; i < num_cmds; ++i) {
         argc = parseCommand(pipe_buffer[i]);
         if (i != num_cmds - 1) { // if not last command
-            if(pipe(fds[i]) < 0) {
+            if (pipe(fds[i]) < 0) {
                 perror("Error in pipe!");
                 exit(2);
             }
@@ -381,6 +368,7 @@ int main() {
         }
 
         if (strcmp(command, "quit") == 0) {
+            printf("QUIT\n");
             break;
         }
 
@@ -392,6 +380,10 @@ int main() {
 
         // Save command in history
         addHistoryEntry(&history, command);
+
+        if(strcmp(command, "if") == 0) {
+            printf("IF STATEMENT FOUND\n");
+        }
 
         // strchr() returns a pointer to the first occurrence of the specified char or NULL if not found.
         if (strchr(command, '|') != NULL) {
