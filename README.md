@@ -58,6 +58,13 @@ fi
 ```
 This command will print "file exists" if the file exists in the current directory, otherwise it will display "file does not exist".
 
+## Video example _if/else_
+
+
+https://user-images.githubusercontent.com/92322613/232252545-f0d8b214-3664-462e-bb73-480a33508899.mp4
+
+
+
 ## History Command
 
 The history feature in this shell allows you to navigate through the last 20 commands executed using the ` arrow up ` or ` arrow down ` keys and then ` Enter `. The last executed command is displayed on the terminal and can be executed again by pressing ` Enter `. (In the begging of the function, we let the Printhistory() function for debugging, you can erase it you want!)
