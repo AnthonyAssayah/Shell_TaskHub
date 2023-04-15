@@ -5,7 +5,6 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <setjmp.h>
-#include <ctype.h>
 #include "myshell.h"
 
 char prompt[MAX_LINE_LEN + 1] = "hello:";
@@ -144,10 +143,8 @@ int ifThen() {
         }
     }
 
-    int argc = 0;
     for (int i = 0; i < commandCount; ++i) {
-        argc = parseCommand(commands[i]);
-        execute(argc);
+        fullExecution(commands[i]);
         free(commands[i]);
     }
     return 0;
@@ -331,11 +328,25 @@ void handlePipeExecution(char *command) {
         wait(NULL);
     }
 }
+/**
+ * Route command according to needed execution (piping or regular).
+ * @param command
+ */
+void fullExecution(char *command) {
+    // strchr() returns a pointer to the first occurrence of the specified char or NULL if not found.
+    if (strchr(command, '|') != NULL) {
+        handlePipeExecution(command);
+    } else {
+        // Split command arguments (into argv variable)
+        int argc = parseCommand(command);
+        // Handle command execution
+        status = execute(argc);
+    }
+}
 
 int main() {
     char command[MAX_LINE_LEN + 1];
     char last_command[MAX_LINE_LEN + 1];
-    int argc = 0;
     int is_if_command = 0;
 
     initHistory(&history);
@@ -383,15 +394,8 @@ int main() {
             is_if_command = 1;
         }
 
-        // strchr() returns a pointer to the first occurrence of the specified char or NULL if not found.
-        if (strchr(command, '|') != NULL) {
-            handlePipeExecution(command);
-        } else {
-            // Split command arguments (into argv variable)
-            argc = parseCommand(command);
-            // Handle command execution
-            status = execute(argc);
-        }
+        fullExecution(command);
+
         if (is_if_command) {
             ifThen();
             is_if_command = 0;

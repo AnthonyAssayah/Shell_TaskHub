@@ -29,6 +29,8 @@ void handlePipeExecution(char *command);
 
 int execute(int argc);
 
+void fullExecution(char *command);
+
 int handleArrows(shell_history *hist, char *command);
 
 #endif //TASK_SHELL_H
