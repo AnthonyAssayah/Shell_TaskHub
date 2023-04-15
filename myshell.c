@@ -99,7 +99,7 @@ int handleArrows(shell_history *hist, char *command) {
     return 0;
 }
 
-int ifThen() {
+int ifThen(int argc) {
     char *commands[MAX_COMMANDS];
     char condition[MAX_LINE_LEN + 1];
     int commandCount = 0, j = 1;
@@ -110,7 +110,7 @@ int ifThen() {
     }
     argv[j - 1] = NULL;
 
-    // execute();
+//    status = execute(argc);
     int currstatus = WEXITSTATUS(status);//(args);
 
     if (!currstatus) {
@@ -156,7 +156,7 @@ int ifThen() {
             }
         }
     }
-    int argc = 0;
+    argc = 0;
     for (int i = 0; i < commandCount; ++i) {
         argc = parseCommand(commands[i]);
         execute(argc);
@@ -254,7 +254,7 @@ int execute(int argc) {
     }
 
     if (!strcmp(argv[0], "if")) {
-        return ifThen();
+        return ifThen(argc);
     }
 
     if (argv[0][0] == '$' && strcmp(argv[1], "=") == 0 && argc >= 3) { // Add new variables
@@ -271,7 +271,7 @@ int execute(int argc) {
 
     if (argc == 3 && strcmp(argv[0], "prompt") == 0 && strcmp(argv[1], "=") == 0) { // Change prompt message
         strcpy(prompt, argv[2]);
-        return 1;
+        return 0;
     }
 
     if (strcmp(argv[0], "echo") == 0) {
@@ -326,12 +326,12 @@ void handlePipeExecution(char *command) {
         }
         if (fork() == 0) {
             // Child process
-            if (i != num_cmds - 1) { // if not last command
+            if (i != num_cmds - 1) { // if not last command - standard output goes to pipe
                 dup2(fds[i][WRITE_END], STDOUT_FILENO);
                 close(fds[i][READ_END]);
                 close(fds[i][WRITE_END]);
             }
-            if (i != 0) {
+            if (i != 0) { // if not first command - standard input comes from pipe
                 dup2(fds[i - 1][READ_END], STDIN_FILENO);
                 close(fds[i - 1][READ_END]);
                 close(fds[i - 1][WRITE_END]);
