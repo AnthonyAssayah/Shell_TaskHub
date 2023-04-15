@@ -13,7 +13,7 @@ void sigint_handler(int sig);
 
 int parseCommand(char *command);
 
-int ifThen(int argc);
+int ifThen();
 
 int addVar(int argc);
 

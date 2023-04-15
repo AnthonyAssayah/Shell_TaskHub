@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <setjmp.h>
+#include <ctype.h>
 #include "myshell.h"
 
 char prompt[MAX_LINE_LEN + 1] = "hello:";
@@ -99,41 +100,41 @@ int handleArrows(shell_history *hist, char *command) {
     return 0;
 }
 
-int ifThen(int argc) {
+int ifThen() {
     char *commands[MAX_COMMANDS];
     char condition[MAX_LINE_LEN + 1];
-    int commandCount = 0, j = 1;
+    int commandCount = 0;
 
-    // remove if from argv and shift the rest of the arguments
-    while (argv[j] != NULL) {
-        argv[j - 1] = argv[j];
-        ++j;
-    }
-    argv[j - 1] = NULL;
-    --argc;
-
-    status = execute(argc);
-    int currstatus = WEXITSTATUS(status);//(args);
-    printf("CURRENT STATUS IS: %d\n", currstatus);
+    int currstatus = WEXITSTATUS(status);
 
     int elseFlag = !currstatus ? 1 : 0;
     /* if !currstatus is True: need to execute 'then' statement. flag will be true until else is reached.
      * otherwise: need to execute 'else' statement. flag will be false until else is reached.
      */
+    int counter = 0; // count number of user args
     if (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
         condition[strlen(condition) - 1] = '\0';
         if (!strcmp(condition, "then")) {
             while (fgets(condition, MAX_LINE_LEN, stdin) != NULL) {
                 condition[strlen(condition) - 1] = '\0';
-                if(!strcmp(condition, "fi")) {
+                if (!strcmp(condition, "fi")) {
+                    if (counter == 0) {
+                        printf("Bad if statement\n");
+                        return 0;
+                    }
                     break;
                 }
+                if (isspace(condition[0]) > 0) { //  isspace() returns true if the character is a space
+                    ++counter; // got argument from user!
+                }
                 if (!strcmp(condition, "else")) {
-                    printf("CHANGE FLAG: %d\n", elseFlag);
+                    if (counter == 0) { // check if there was a then condition
+                        printf("Bad if statement\n");
+                        return 0;
+                    }
                     elseFlag = !elseFlag;
-                    printf("FLAG IS NOW: %d\n", elseFlag);
+                    counter = 0; // reset counter to check for at least one argument before fi
                 } else if (elseFlag) {
-                    printf("ADD COMMAND\n");
                     commands[commandCount++] = strdup(condition);
                 }
             }
@@ -143,7 +144,7 @@ int ifThen(int argc) {
         }
     }
 
-    argc = 0;
+    int argc = 0;
     for (int i = 0; i < commandCount; ++i) {
         argc = parseCommand(commands[i]);
         execute(argc);
@@ -238,10 +239,6 @@ int execute(int argc) {
 
     if (argv[0] == NULL) {
         return 0;
-    }
-
-    if (!strcmp(argv[0], "if")) {
-        return ifThen(argc);
     }
 
     if (argv[0][0] == '$' && strcmp(argv[1], "=") == 0 && argc >= 3) { // Add new variables
@@ -339,6 +336,7 @@ int main() {
     char command[MAX_LINE_LEN + 1];
     char last_command[MAX_LINE_LEN + 1];
     int argc = 0;
+    int is_if_command = 0;
 
     initHistory(&history);
 
@@ -368,7 +366,6 @@ int main() {
         }
 
         if (strcmp(command, "quit") == 0) {
-            printf("QUIT\n");
             break;
         }
 
@@ -381,8 +378,9 @@ int main() {
         // Save command in history
         addHistoryEntry(&history, command);
 
-        if(strcmp(command, "if") == 0) {
-            printf("IF STATEMENT FOUND\n");
+        if (strncmp(command, "if", 2) == 0) { // check if command starts with 'if'
+            memmove(command, command + 2, strlen(command)); // shift to arguments
+            is_if_command = 1;
         }
 
         // strchr() returns a pointer to the first occurrence of the specified char or NULL if not found.
@@ -393,6 +391,10 @@ int main() {
             argc = parseCommand(command);
             // Handle command execution
             status = execute(argc);
+        }
+        if (is_if_command) {
+            ifThen();
+            is_if_command = 0;
         }
     }
     history_destroy(&history);
