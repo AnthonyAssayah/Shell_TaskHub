@@ -120,7 +120,7 @@ int ifThen() {
                 if (!strcmp(condition, "fi")) {
                     if (counter == 0) {
                         printf("Bad if statement\n");
-                        return 0;
+                        return 3;
                     }
                     break;
                 }
@@ -130,7 +130,7 @@ int ifThen() {
                 if (!strcmp(condition, "else")) {
                     if (counter == 0) { // check if there was a then condition
                         printf("Bad if statement\n");
-                        return 0;
+                        return 3;
                     }
                     elseFlag = !elseFlag;
                     counter = 0; // reset counter to check for at least one argument before fi
@@ -140,7 +140,7 @@ int ifThen() {
             }
         } else {
             printf("Bad if statement\n");
-            return 0;
+            return 3;
         }
     }
 
@@ -150,7 +150,7 @@ int ifThen() {
         execute(argc);
         free(commands[i]);
     }
-    return 1;
+    return 0;
 }
 
 int addVar(int argc) {
