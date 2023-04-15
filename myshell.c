@@ -19,7 +19,7 @@ void sigint_handler(int sig) {
     write(STDOUT_FILENO, "\nYou typed Control-C!\n", 22);
     siglongjmp(jmpbuf, 1);
 }
-
+ 
 /*/
  * https://stackoverflow.com/questions/46728680/how-to-temporarily-suppress-output-from-printf
  */
