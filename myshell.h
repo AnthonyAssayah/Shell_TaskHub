@@ -29,7 +29,7 @@ int handlePipeExecution(char *command);
 
 int execute(int argc);
 
-int fullExecution(char *command);
+int fullExecution(char *command, int is_if_command);
 
 int handleArrows(shell_history *hist, char *command);
 

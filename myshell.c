@@ -20,6 +20,28 @@ void sigint_handler(int sig) {
     siglongjmp(jmpbuf, 1);
 }
 
+/*/
+ * https://stackoverflow.com/questions/46728680/how-to-temporarily-suppress-output-from-printf
+ */
+int supress_stdout() {
+    fflush(stdout);
+    int ret = dup(STDOUT_FILENO);
+    int nullfd = open("/dev/null", O_WRONLY);
+    if (nullfd < 0) {
+        perror("Could not open file!\n");
+        exit(4);
+    }
+    dup2(nullfd, STDOUT_FILENO);
+    close(nullfd);
+    return ret;
+}
+
+void resume_stdout(int fd) {
+    fflush(stdout);
+    dup2(fd, STDOUT_FILENO);
+    close(fd);
+}
+
 /**
  * Split user command arguments.
  * @return Number of command arguments.
@@ -142,7 +164,7 @@ int ifThen() {
     }
 
     for (int i = 0; i < commandCount; ++i) {
-        fullExecution(commands[i]);
+        fullExecution(commands[i], 0);
         free(commands[i]);
     }
     return 0;
@@ -334,15 +356,20 @@ int handlePipeExecution(char *command) {
  * Route command according to needed execution (piping or regular).
  * @param command
  */
-int fullExecution(char *command) {
+int fullExecution(char *command, int is_if_command) {
+    int rv = -1, fd = -1;
+    if (is_if_command) { fd = supress_stdout(); }
     // strchr() returns a pointer to the first occurrence of the specified char or NULL if not found.
     if (strchr(command, '|') != NULL) {
-        return handlePipeExecution(command);
+        rv = handlePipeExecution(command);
+    } else {
+        // Split command arguments (into argv variable)
+        int argc = parseCommand(command);
+        // Handle command execution
+        rv = execute(argc);
     }
-    // Split command arguments (into argv variable)
-    int argc = parseCommand(command);
-    // Handle command execution
-    return execute(argc);
+    if (is_if_command) { resume_stdout(fd); }
+    return rv;
 }
 
 int main() {
@@ -393,8 +420,7 @@ int main() {
             memmove(command, command + 2, strlen(command)); // shift to arguments
             is_if_command = 1;
         }
-
-        fullExecution(command);
+        fullExecution(command, is_if_command);
         if (is_if_command) {
             ifThen();
             is_if_command = 0;
